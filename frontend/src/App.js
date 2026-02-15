@@ -49,8 +49,9 @@ return (
 <input type="password" placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} style={{ display: 'block', margin: '10px auto' }} />
 <input type="text" placeholder="ID Cliente" value={clientId} onChange={(e) => setClientId(e.target.value)} style={{ display: 'block', margin: '10px auto' }} />
 <input type="number" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} />
-<button onClick={() => atualizarPontos('adicionar')}>+ Dar</button>
-<button onClick={() => atualizarPontos('retirar')}>- Tirar</button>
+<br /><br />
+<button onClick={() => atualizarPontos('adicionar')}>+ Dar Pontos</button>
+<button onClick={() => atualizarPontos('retirar')}>- Retirar Pontos</button>
 </div>
 ) : (
 <Cliente />
