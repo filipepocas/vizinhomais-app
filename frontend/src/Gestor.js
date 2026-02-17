@@ -1,77 +1,73 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, query, getDocs, orderBy } from "firebase/firestore";
+import { collection, doc, setDoc, getDocs } from "firebase/firestore";
 
 function Gestor() {
-const [historicoGlobal, setHistoricoGlobal] = useState([]);
-const [dataFiltro, setDataFiltro] = useState('');
+const [lojas, setLojas] = useState([]);
+const [nomeLoja, setNomeLoja] = useState('');
+const [nif, setNif] = useState('');
+const [percentagem, setPercentagem] = useState('10');
+const [codigoPostal, setCodigoPostal] = useState('');
 
-const carregarDados = async () => {
-try {
-const q = query(collection(db, "historico"), orderBy("data", "desc"));
-const snap = await getDocs(q);
+const carregarLojas = async () => {
+const snap = await getDocs(collection(db, "comerciantes"));
 const lista = [];
-snap.forEach((doc) => {
-const data = doc.data();
-if (data && data.valorCashback !== undefined) {
-const dataTransacao = data.data?.toDate().toISOString().split('T')[0];
-if (!dataFiltro || dataFiltro === dataTransacao) {
-lista.push({ id: doc.id, ...data });
-}
-}
-});
-setHistoricoGlobal(lista);
-} catch (e) { console.error("Erro:", e); }
+snap.forEach((doc) => lista.push({ id: doc.id, ...doc.data() }));
+setLojas(lista);
 };
 
-const exportarCSV = () => {
-let csvContent = "data:text/csv;charset=utf-8,Data,Loja,Cliente,Tipo,Valor\n";
-historicoGlobal.forEach((h) => {
-const dataFormatada = h.data?.toDate().toLocaleString().replace(',', '');
-const linha = dataFormatada + "," + h.nomeLoja + "," + h.clienteId + "," + h.tipo + "," + h.valorCashback + "\n";
-csvContent += linha;
+const registarLoja = async () => {
+if (!nomeLoja || !nif || !codigoPostal) { alert("Preencha todos os campos!"); return; }
+try {
+await setDoc(doc(db, "comerciantes", nif), {
+nome: nomeLoja,
+nif: nif,
+percentagem: Number(percentagem) / 100,
+codigoPostal: codigoPostal,
+utilizadores: [nif] // Exemplo: password inicial é o NIF
 });
-const encodedUri = encodeURI(csvContent);
-const link = document.createElement("a");
-link.setAttribute("href", encodedUri);
-link.setAttribute("download", "auditoria_vizinhomais.csv");
-document.body.appendChild(link);
-link.click();
-document.body.removeChild(link);
+alert("Loja registada com sucesso!");
+carregarLojas();
+setNomeLoja(''); setNif(''); setCodigoPostal('');
+} catch (e) { console.error(e); }
 };
 
-useEffect(() => { carregarDados(); }, [dataFiltro]);
+useEffect(() => { carregarLojas(); }, []);
 
 return (
 
 <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-<h1>Painel do Gestor - Auditoria</h1>
-<div style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-<input type="date" value={dataFiltro} onChange={(e) => setDataFiltro(e.target.value)} style={{ padding: '8px' }} />
-<button onClick={() => setDataFiltro('')} style={{ padding: '8px' }}>Limpar Filtro</button>
-<button onClick={exportarCSV} style={{ padding: '8px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>Exportar Excel (CSV)</button>
+<h1>Painel Admin - Registo de Comerciantes</h1>
+<div style={{ background: '#eee', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
+<h3>Nova Loja</h3>
+<input type="text" placeholder="Nome da Loja" value={nomeLoja} onChange={(e) => setNomeLoja(e.target.value)} style={{marginRight: '10px'}}/>
+<input type="text" placeholder="NIF" value={nif} onChange={(e) => setNif(e.target.value)} style={{marginRight: '10px'}}/>
+<input type="text" placeholder="Código Postal" value={codigoPostal} onChange={(e) => setCodigoPostal(e.target.value)} style={{marginRight: '10px'}}/>
+<select value={percentagem} onChange={(e) => setPercentagem(e.target.value)}>
+<option value="5">5%</option>
+<option value="10">10%</option>
+<option value="15">15%</option>
+</select>
+<button onClick={registarLoja} style={{marginLeft: '10px', background: 'blue', color: 'white'}}>Registar</button>
 </div>
 
+<h3>Lojas Registadas</h3>
 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
 <thead>
 <tr style={{ background: '#333', color: 'white' }}>
-<th style={{ padding: '10px', border: '1px solid #ddd' }}>Data/Hora</th>
-<th style={{ padding: '10px', border: '1px solid #ddd' }}>Loja</th>
-<th style={{ padding: '10px', border: '1px solid #ddd' }}>Cliente</th>
-<th style={{ padding: '10px', border: '1px solid #ddd' }}>Tipo</th>
-<th style={{ padding: '10px', border: '1px solid #ddd' }}>Valor</th>
+<th style={{ padding: '10px' }}>NIF</th>
+<th style={{ padding: '10px' }}>Nome</th>
+<th style={{ padding: '10px' }}>CP</th>
+<th style={{ padding: '10px' }}>% Cashback</th>
 </tr>
 </thead>
 <tbody>
-{historicoGlobal.map((h) => (
-<tr key={h.id}>
-<td style={{ padding: '10px', border: '1px solid #ddd' }}>{h.data?.toDate().toLocaleString()}</td>
-<td style={{ padding: '10px', border: '1px solid #ddd' }}>{h.nomeLoja}</td>
-<td style={{ padding: '10px', border: '1px solid #ddd' }}>{h.clienteId}</td>
-<td style={{ padding: '10px', border: '1px solid #ddd' }}>{h.tipo}</td>
-<td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold', color: h.valorCashback > 0 ? 'green' : 'red' }}>
-{Number(h.valorCashback).toFixed(2)}€
-</td>
+{lojas.map((l) => (
+<tr key={l.id} style={{textAlign: 'center', borderBottom: '1px solid #ddd'}}>
+<td style={{ padding: '10px' }}>{l.nif}</td>
+<td style={{ padding: '10px' }}>{l.nome}</td>
+<td style={{ padding: '10px' }}>{l.codigoPostal}</td>
+<td style={{ padding: '10px' }}>{(l.percentagem * 100).toFixed(0)}%</td>
 </tr>
 ))}
 </tbody>
