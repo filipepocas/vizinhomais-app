@@ -1,82 +1,54 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { db } from './firebase';
-import { collection, doc, setDoc, getDocs } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 
 function Gestor() {
-const [lojas, setLojas] = useState([]);
-const [nomeLoja, setNomeLoja] = useState('');
-const [nif, setNif] = useState('');
-const [percentagem, setPercentagem] = useState(10); // Valor padrão 10%
-const [codigoPostal, setCodigoPostal] = useState('');
+  const [nome, setNome] = useState('');
+  const [nif, setNif] = useState('');
+  const [password, setPassword] = useState('');
+  const [percentagem, setPercentagem] = useState('');
+  const [carregando, setCarregando] = useState(false);
 
-const carregarLojas = async () => {
-const snap = await getDocs(collection(db, "comerciantes"));
-const lista = [];
-snap.forEach((doc) => lista.push({ id: doc.id, ...doc.data() }));
-setLojas(lista);
-};
+  const registarLoja = async () => {
+    if (!nome || !nif || !password || !percentagem) {
+      alert("Preencha todos os campos!");
+      return;
+    }
+    setCarregando(true);
+    try {
+      // Regista a loja usando o NIF como ID do documento
+      await setDoc(doc(db, "comerciantes", nif), {
+        nome: nome,
+        nif: nif,
+        password: password,
+        percentagem: Number(percentagem) / 100, // Converte 10% para 0.1
+        dataRegisto: new Date()
+      });
+      alert("Loja registada com sucesso!");
+      setNome(''); setNif(''); setPassword(''); setPercentagem('');
+    } catch (e) {
+      alert("Erro ao registar: " + e.message);
+    }
+    setCarregando(false);
+  };
 
-const registarLoja = async () => {
-if (!nomeLoja || !nif || !codigoPostal) { alert("Preencha todos os campos!"); return; }
-if (percentagem < 1 || percentagem > 50) { alert("O cashback deve ser entre 1% e 50%"); return; }
-
-try {
-await setDoc(doc(db, "comerciantes", nif), {
-nome: nomeLoja,
-nif: nif,
-percentagem: Number(percentagem) / 100,
-codigoPostal: codigoPostal,
-utilizadores: [nif]
-});
-alert("Loja registada com sucesso!");
-carregarLojas();
-setNomeLoja(''); setNif(''); setCodigoPostal('');
-} catch (e) { console.error(e); }
-};
-
-useEffect(() => { carregarLojas(); }, []);
-
-return (
-
-<div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-<h1>Painel Admin - Registo de Comerciantes</h1>
-<div style={{ background: '#eee', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
-<h3>Nova Loja</h3>
-<input type="text" placeholder="Nome da Loja" value={nomeLoja} onChange={(e) => setNomeLoja(e.target.value)} style={{marginRight: '10px', padding: '5px'}}/>
-<input type="text" placeholder="NIF" value={nif} onChange={(e) => setNif(e.target.value)} style={{marginRight: '10px', padding: '5px'}}/>
-<input type="text" placeholder="Código Postal" value={codigoPostal} onChange={(e) => setCodigoPostal(e.target.value)} style={{marginRight: '10px', padding: '5px'}}/>
-
-
-
-
-<label>Percentagem Cashback (1 a 50%): </label>
-<input type="number" min="1" max="50" value={percentagem} onChange={(e) => setPercentagem(e.target.value)} style={{padding: '5px', width: '60px'}} /> %
-<button onClick={registarLoja} style={{marginLeft: '20px', background: 'blue', color: 'white', padding: '10px', border: 'none', borderRadius: '5px', cursor: 'pointer'}}>Registar Loja</button>
-</div>
-
-<h3>Lojas Registadas</h3>
-<table style={{ width: '100%', borderCollapse: 'collapse' }}>
-<thead>
-<tr style={{ background: '#333', color: 'white' }}>
-<th style={{ padding: '10px' }}>NIF</th>
-<th style={{ padding: '10px' }}>Nome</th>
-<th style={{ padding: '10px' }}>CP</th>
-<th style={{ padding: '10px' }}>% Cashback</th>
-</tr>
-</thead>
-<tbody>
-{lojas.map((l) => (
-<tr key={l.id} style={{textAlign: 'center', borderBottom: '1px solid #ddd'}}>
-<td style={{ padding: '10px' }}>{l.nif}</td>
-<td style={{ padding: '10px' }}>{l.nome}</td>
-<td style={{ padding: '10px' }}>{l.codigoPostal}</td>
-<td style={{ padding: '10px' }}>{(l.percentagem * 100).toFixed(0)}%</td>
-</tr>
-))}
-</tbody>
-</table>
-</div>
-);
+  return (
+    <div style={{ fontFamily: 'sans-serif' }}>
+      <h2>🛠️ Gestão de Lojas (Admin)</h2>
+      
+      <div style={{ background: '#f4f4f4', padding: '20px', borderRadius: '5px' }}>
+        <h3>Adicionar Nova Loja</h3>
+        <input type="text" placeholder="Nome da Loja" value={nome} onChange={(e) => setNome(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '10px' }} />
+        <input type="text" placeholder="NIF da Loja" value={nif} onChange={(e) => setNif(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '10px' }} />
+        <input type="password" placeholder="Password de Acesso" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '10px' }} />
+        <input type="number" placeholder="Percentagem Cashback (%)" value={percentagem} onChange={(e) => setPercentagem(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '10px' }} />
+        
+        <button onClick={registarLoja} disabled={carregando} style={{ width: '100%', padding: '10px', background: '#3498db', color: 'white', border: 'none', fontWeight: 'bold' }}>
+          {carregando ? "A REGISTAR..." : "REGISTAR LOJA"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default Gestor;
