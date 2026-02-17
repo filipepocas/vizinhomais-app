@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { doc, setDoc, increment, collection, addDoc, serverTimestamp, getDoc, getDocs, query, where } from "firebase/firestore";
+import { doc, setDoc, increment, collection, addDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import Cliente from './Cliente';
 import Gestor from './Gestor';
 import Relatorio from './Relatorio';
@@ -14,19 +14,25 @@ const [pin, setPin] = useState('');
 const [carregando, setCarregando] = useState(false);
 const [lojaData, setLojaData] = useState(null);
 
-// NIF da loja de teste - Garante que este NIF existe no teu Gestor!
-const NIF_LOJA = "123456789";
+// ESTADOS DE LOGIN
+const [loginNif, setLoginNif] = useState('');
+const [loginPass, setLoginPass] = useState('');
+const [isLoggedIn, setIsLoggedIn] = useState(false);
+const [nifLogado, setNifLogado] = useState(null);
 
-useEffect(() => {
-const buscarDadosLoja = async () => {
+const autenticarComerciante = async () => {
 try {
-const docRef = doc(db, "comerciantes", NIF_LOJA);
+const docRef = doc(db, "comerciantes", loginNif);
 const docSnap = await getDoc(docRef);
-if (docSnap.exists()) { setLojaData(docSnap.data()); }
-} catch (e) { console.error("Erro:", e); }
+if (docSnap.exists() && docSnap.data().password === loginPass) {
+setLojaData(docSnap.data());
+setNifLogado(loginNif);
+setIsLoggedIn(true);
+} else {
+alert("NIF ou Password incorretos!");
+}
+} catch (e) { console.error(e); }
 };
-buscarDadosLoja();
-}, []);
 
 const movimentarCashback = async (tipo) => {
 if (pin !== "1234") { alert("PIN incorreto!"); return; }
@@ -37,26 +43,19 @@ const valorBase = Number(valorFatura);
 const valorCashback = tipo === 'emissao' ? (valorBase * lojaData.percentagem) : -(valorBase * lojaData.percentagem);
 
 try {
-// 1. Verificar saldo disponível real
-const saldoRef = doc(db, "clientes", clientId, "saldos_por_loja", NIF_LOJA);
+const saldoRef = doc(db, "clientes", clientId, "saldos_por_loja", nifLogado);
 const saldoSnap = await getDoc(saldoRef);
 const saldoAtual = saldoSnap.exists() ? saldoSnap.data().saldoDisponivel : 0;
 
 if (tipo === 'devolucao' && saldoAtual < Math.abs(valorCashback)) {
-alert("Saldo disponível insuficiente para esta devolução (verifique os 2 dias de carência).");
+alert("Saldo disponível insuficiente (verifique carência de 2 dias).");
 setCarregando(false);
 return;
 }
 
-// 2. Atualizar saldo
-await setDoc(saldoRef, {
-saldoDisponivel: increment(valorCashback),
-nomeLoja: lojaData.nome
-}, { merge: true });
-
-// 3. Registar no histórico
+await setDoc(saldoRef, { saldoDisponivel: increment(valorCashback), nomeLoja: lojaData.nome }, { merge: true });
 await addDoc(collection(db, "historico"), {
-clienteId: clientId, lojaId: NIF_LOJA, nomeLoja: lojaData.nome, fatura: numFatura,
+clienteId: clientId, lojaId: nifLogado, nomeLoja: lojaData.nome, fatura: numFatura,
 valorVenda: valorBase, valorCashback: valorCashback, data: serverTimestamp(), tipo: tipo
 });
 
@@ -66,6 +65,20 @@ setClientId(''); setValorFatura(''); setNumFatura('');
 finally { setCarregando(false); }
 };
 
+// Ecrã de Login
+if (!isLoggedIn) {
+return (
+
+<div style={{ padding: '50px', textAlign: 'center', fontFamily: 'sans-serif', backgroundColor: '#2c3e50', minHeight: '100vh', color: 'white' }}>
+<h1>Login do Comerciante</h1>
+<input type="text" placeholder="NIF" value={loginNif} onChange={(e) => setLoginNif(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '250px' }} />
+<input type="password" placeholder="Password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '250px' }} />
+<button onClick={autenticarComerciante} style={{ padding: '10px 20px', background: '#f1c40f', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>ENTRAR</button>
+</div>
+);
+}
+
+// Ecrã Principal (após login)
 return (
 
 <div style={{ backgroundColor: '#f4f4f4', minHeight: '100vh', fontFamily: 'sans-serif' }}>
@@ -74,14 +87,15 @@ return (
 <button onClick={() => setView('cliente')} style={{ background: 'none', border: 'none', color: view === 'cliente' ? '#f1c40f' : 'white', cursor: 'pointer', fontWeight: 'bold' }}>CLIENTE</button>
 <button onClick={() => setView('relatorio')} style={{ background: 'none', border: 'none', color: view === 'relatorio' ? '#f1c40f' : 'white', cursor: 'pointer', fontWeight: 'bold' }}>RELATÓRIOS</button>
 <button onClick={() => setView('gestor')} style={{ background: 'none', border: 'none', color: view === 'gestor' ? '#f1c40f' : 'white', cursor: 'pointer', fontWeight: 'bold' }}>ADMIN</button>
+<button onClick={() => setIsLoggedIn(false)} style={{ background: 'none', border: 'none', color: 'red', cursor: 'pointer', marginLeft: 'auto' }}>Sair</button>
 </nav>
 
 <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
 {view === 'comerciante' ? (
 <div style={{ background: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-<h2>{lojaData ? 'Loja: ' + lojaData.nome : "A carregar..."}</h2>
-<p style={{color: 'gray'}}>Cashback: {lojaData ? (lojaData.percentagem * 100).toFixed(0) + '%' : '0%'}</p>
-<input type="password" placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '80%' }} />
+<h2>Terminal: {lojaData.nome}</h2>
+<p style={{color: 'gray'}}>Percentagem: {(lojaData.percentagem * 100).toFixed(0)}%</p>
+<input type="password" placeholder="PIN de Segurança" value={pin} onChange={(e) => setPin(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '80%' }} />
 <hr />
 <input type="text" placeholder="Telemóvel Cliente" value={clientId} onChange={(e) => setClientId(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '80%' }} />
 <input type="text" placeholder="Fatura / Nota" value={numFatura} onChange={(e) => setNumFatura(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '80%' }} />
@@ -97,5 +111,4 @@ return (
 </div>
 );
 }
-
 export default App;
