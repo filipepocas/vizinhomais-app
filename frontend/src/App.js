@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { doc, setDoc, increment, collection, addDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import { doc, setDoc, increment, collection, addDoc, serverTimestamp, getDoc, query, where, orderBy, getDocs, limit } from "firebase/firestore";
 import Cliente from './Cliente';
 import Gestor from './Gestor';
 import Relatorio from './Relatorio';
@@ -13,11 +13,30 @@ function App() {
   const [pin, setPin] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [lojaData, setLojaData] = useState(null);
+  const [historico, setHistorico] = useState([]);
 
   const [loginNif, setLoginNif] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [nifLogado, setNifLogado] = useState(null);
+
+  // Busca o histórico da loja logada
+  useEffect(() => {
+    if (!isLoggedIn || !nifLogado) return;
+    const buscarHistorico = async () => {
+      const q = query(
+        collection(db, "historico"),
+        where("lojaId", "==", nifLogado),
+        orderBy("data", "desc"),
+        limit(5)
+      );
+      const snap = await getDocs(q);
+      const lista = [];
+      snap.forEach((doc) => lista.push(doc.data()));
+      setHistorico(lista);
+    };
+    buscarHistorico();
+  }, [isLoggedIn, nifLogado]);
 
   const autenticarComerciante = async () => {
     if (!loginNif || !loginPass) { alert("Preencha os dados!"); return; }
@@ -55,14 +74,25 @@ function App() {
       const valorBase = Number(valorFatura);
       const perc = lojaData.percentagem || 0;
       const valorCashback = tipo === 'emissao' ? (valorBase * perc) : -(valorBase * perc);
+      
       const saldoRef = doc(db, "clientes", clientId, "saldos_por_loja", nifLogado);
       await setDoc(saldoRef, { saldoDisponivel: increment(valorCashback), nomeLoja: lojaData.nome }, { merge: true });
+      
       await addDoc(collection(db, "historico"), {
         clienteId: clientId, lojaId: nifLogado, nomeLoja: lojaData.nome, fatura: numFatura,
         valorVenda: valorBase, valorCashback: valorCashback, data: serverTimestamp(), tipo: tipo
       });
+      
       alert("Operação concluída!");
       setClientId(''); setValorFatura(''); setNumFatura('');
+      
+      // Atualiza o histórico localmente
+      const q = query(collection(db, "historico"), where("lojaId", "==", nifLogado), orderBy("data", "desc"), limit(5));
+      const snap = await getDocs(q);
+      const lista = [];
+      snap.forEach((doc) => lista.push(doc.data()));
+      setHistorico(lista);
+
     } catch (e) { alert("Erro: " + e.message); }
     finally { setCarregando(false); }
   };
@@ -98,6 +128,15 @@ function App() {
             <input type="number" placeholder="Valor (€)" value={valorFatura} onChange={(e) => setValorFatura(e.target.value)} />
             <button onClick={() => movimentarCashback('emissao')} disabled={carregando}>EMITIR</button>
             <button onClick={() => movimentarCashback('devolucao')} disabled={carregando}>DEVOLUÇÃO</button>
+            
+            <h3>Últimos Movimentos</h3>
+            {historico.map((h, i) => (
+              <p key={i}>
+                {h.tipo === 'emissao' ? '➕' : '➖'} 
+                {h.valorCashback.toFixed(2)}€ - Fatura {h.fatura} 
+                ({h.data ? h.data.toDate().toLocaleDateString() : 'agora'})
+              </p>
+            ))}
           </div>
         ) : view === 'cliente' ? <Cliente /> : <Gestor />}
       </div>
