@@ -1,85 +1,71 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, query, getDocs, orderBy, doc, setDoc, increment, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 function Cliente() {
-const [id, setId] = useState(localStorage.getItem('clienteId') || '');
+const [clienteId, setClienteId] = useState('');
 const [saldos, setSaldos] = useState([]);
-const [historico, setHistorico] = useState([]);
-const [valorDesconto, setValorDesconto] = useState('');
-const [pinCliente, setPinCliente] = useState('');
+const [carregando, setCarregando] = useState(false);
 
-const consultarDados = async () => {
-if (!id) return;
-localStorage.setItem('clienteId', id);
+const verificarSaldo = async () => {
+if (!clienteId) return;
+setCarregando(true);
 try {
-const saldosSnap = await getDocs(collection(db, "clientes", id, "saldos_por_loja"));
-const listaSaldos = [];
-saldosSnap.forEach((doc) => { listaSaldos.push({ id: doc.id, ...doc.data() }); });
-setSaldos(listaSaldos);
+const q = query(collection(db, "historico"), where("clienteId", "==", clienteId));
+const snap = await getDocs(q);
+const resumoPorLoja = {};
+const agora = new Date();
 
-const hQuery = query(collection(db, "historico"), orderBy("data", "desc"));
-const hSnap = await getDocs(hQuery);
-const listaH = [];
-hSnap.forEach((doc) => {
-if(doc.data().clienteId === id) { listaH.push({ id: doc.id, ...doc.data() }); }
+snap.forEach((doc) => {
+const trans = doc.data();
+const dataTrans = trans.data.toDate();
+const diasPassados = (agora - dataTrans) / (1000 * 60 * 60 * 24);
+
+if (!resumoPorLoja[trans.lojaId]) {
+resumoPorLoja[trans.lojaId] = { nomeLoja: trans.nomeLoja, disponivel: 0, pendente: 0 };
+}
+
+if (diasPassados >= 2) {
+resumoPorLoja[trans.lojaId].disponivel += trans.valorCashback;
+} else {
+resumoPorLoja[trans.lojaId].pendente += trans.valorCashback;
+}
 });
-setHistorico(listaH);
+setSaldos(Object.values(resumoPorLoja));
 } catch (e) { console.error(e); }
+setCarregando(false);
 };
-
-const utilizarSaldo = async (lojaId, nomeLoja, saldoAtual) => {
-const valor = Number(valorDesconto);
-if (!valor || valor <= 0) { alert("Valor inválido!"); return; }
-if (valor > saldoAtual) { alert("Saldo insuficiente!"); return; }
-if (pinCliente !== "9999") { alert("PIN de Cliente incorreto! (Teste: 9999)"); return; }
-
-try {
-const saldoRef = doc(db, "clientes", id, "saldos_por_loja", lojaId);
-await setDoc(saldoRef, {
-saldoDisponivel: increment(-valor)
-}, { merge: true });
-
-await addDoc(collection(db, "historico"), {
-clienteId: id,
-lojaId: lojaId,
-nomeLoja: nomeLoja,
-valorCashback: -valor,
-data: serverTimestamp(),
-tipo: "utilizacao"
-});
-
-alert("Sucesso! Desconto de " + valor + "€ aplicado.");
-setValorDesconto('');
-setPinCliente('');
-consultarDados();
-} catch (e) { alert("Erro na operação."); }
-};
-
-useEffect(() => { if (id) { consultarDados(); } }, []);
 
 return (
 
-<div style={{ textAlign: 'center', marginTop: '50px', padding: '20px', fontFamily: 'sans-serif' }}>
-<h1>O Meu Cartão VizinhoMais</h1>
-<input value={id} onChange={(e) => setId(e.target.value)} placeholder="Telemóvel do Cliente" style={{ padding: '10px' }} />
-<button onClick={consultarDados} style={{ padding: '10px', marginLeft: '5px' }}>Ver Meus Cartões</button>
+<div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
+<h1>Área do Cliente</h1>
+<div style={{ marginBottom: '20px' }}>
+<input type="text" placeholder="Telemóvel do Cliente" value={clienteId} onChange={(e) => setClienteId(e.target.value)} style={{ padding: '10px', width: '200px' }} />
+<button onClick={verificarSaldo} style={{ padding: '10px', marginLeft: '10px' }}>Ver Saldo</button>
+</div>
 
-<div style={{ marginTop: '30px' }}>
-{saldos.length > 0 ? (
-saldos.map((s) => (
-<div key={s.id} style={{ border: '2px solid #333', borderRadius: '15px', padding: '15px', margin: '15px auto', maxWidth: '300px', backgroundColor: '#fff', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
-<h2 style={{ margin: '0', color: '#333' }}>{s.nomeLoja}</h2>
-<p style={{ fontSize: '24px', fontWeight: 'bold', color: 'green' }}>{s.saldoDisponivel.toFixed(2)}€</p>
-<input type="number" placeholder="Valor a gastar" onChange={(e) => setValorDesconto(e.target.value)} style={{ width: '90%', padding: '8px', marginBottom: '10px' }} />
-<input type="password" placeholder="Teu PIN (9999)" onChange={(e) => setPinCliente(e.target.value)} style={{ width: '90%', padding: '8px', marginBottom: '10px' }} />
-<button onClick={() => utilizarSaldo(s.id, s.nomeLoja, s.saldoDisponivel)} style={{ background: '#e67e22', color: 'white', padding: '10px 20px', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' }}>Utilizar Saldo Agora</button>
-</div>
-))
-) : (
-<p style={{ color: '#666' }}>Ainda não tens saldos nesta loja.</p>
+{carregando ? <p>A calcular saldos...</p> : (
+
+<table style={{ width: '100%', borderCollapse: 'collapse' }}>
+<thead>
+<tr style={{ background: '#333', color: 'white' }}>
+<th style={{ padding: '10px' }}>Loja</th>
+<th style={{ padding: '10px' }}>Saldo Disponível (2+ dias)</th>
+<th style={{ padding: '10px' }}>Saldo Pendente</th>
+</tr>
+</thead>
+<tbody>
+{saldos.map((s, i) => (
+<tr key={i} style={{textAlign: 'center', borderBottom: '1px solid #ddd'}}>
+<td style={{ padding: '10px' }}>{s.nomeLoja}</td>
+<td style={{ padding: '10px', color: 'green', fontWeight: 'bold' }}>{s.disponivel.toFixed(2)}€</td>
+<td style={{ padding: '10px', color: 'orange' }}>{s.pendente.toFixed(2)}€</td>
+</tr>
+))}
+</tbody>
+</table>
 )}
-</div>
 </div>
 );
 }
