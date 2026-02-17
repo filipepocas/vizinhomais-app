@@ -6,47 +6,30 @@ import Gestor from './Gestor';
 import Relatorio from './Relatorio';
 
 function App() {
-  // Estados de Navegação e App
   const [view, setView] = useState('comerciante');
-  const [carregando, setCarregando] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [nifLogado, setNifLogado] = useState(null);
   const [lojaData, setLojaData] = useState(null);
+  const [carregando, setCarregando] = useState(false);
 
-  // Estados do Formulário Terminal
+  // Estados do Terminal
   const [clientId, setClientId] = useState('');
   const [valorFatura, setValorFatura] = useState('');
   const [numFatura, setNumFatura] = useState('');
   const [pinComerciante, setPinComerciante] = useState('');
   const [historico, setHistorico] = useState([]);
 
-  // Monitor de Histórico
   useEffect(() => {
-    if (isLoggedIn && nifLogado) {
-      buscarUltimosMovimentos();
-    }
+    if (isLoggedIn && nifLogado) buscarHistorico();
   }, [isLoggedIn, nifLogado]);
 
-  const buscarUltimosMovimentos = async () => {
-    try {
-      const q = query(
-        collection(db, "historico"),
-        where("lojaId", "==", nifLogado),
-        orderBy("data", "desc"),
-        limit(5)
-      );
-      const snap = await getDocs(q);
-      const lista = [];
-      snap.forEach((doc) => lista.push(doc.data()));
-      setHistorico(lista);
-    } catch (e) {
-      console.error("Erro ao carregar histórico:", e);
-    }
+  const buscarHistorico = async () => {
+    const q = query(collection(db, "historico"), where("lojaId", "==", nifLogado), orderBy("data", "desc"), limit(5));
+    const snap = await getDocs(q);
+    setHistorico(snap.docs.map(d => d.data()));
   };
 
-  // Autenticação do Comerciante
   const login = async (nif, pass) => {
-    if (!nif || !pass) return;
     setCarregando(true);
     try {
       const docSnap = await getDoc(doc(db, "comerciantes", nif));
@@ -54,123 +37,89 @@ function App() {
         setLojaData(docSnap.data());
         setNifLogado(nif);
         setIsLoggedIn(true);
-      } else {
-        alert("NIF ou Password incorretos!");
-      }
-    } catch (e) {
-      alert("Erro no login: " + e.message);
-    }
-    setCarregando(false);
+      } else { alert("Acesso Negado."); }
+    } finally { setCarregando(false); }
   };
 
-  // Lógica Principal: Movimentação de Saldo (O "Coração" do esqueleto)
-  const processarOperacao = async (tipo) => {
-    if (pinComerciante !== "1234") { alert("PIN do Comerciante Inválido!"); return; }
-    if (!clientId || !valorFatura) { alert("Dados em falta!"); return; }
+  const executarOperacao = async (tipo) => {
+    if (pinComerciante !== "1234") { alert("PIN Inválido"); return; }
+    if (!clientId || !valorFatura) { alert("Dados incompletos"); return; }
     
-    const valor = Number(valorFatura);
-    if (isNaN(valor) || valor <= 0) { alert("Valor inválido!"); return; }
-
     setCarregando(true);
     try {
-      const percentagemLoja = lojaData.percentagem || 0;
+      const v = Number(valorFatura);
+      const perc = lojaData.percentagem || 0;
+      const valorMov = tipo === 'emissao' ? (v * perc) : -v;
+
       const saldoRef = doc(db, "clientes", clientId, "saldos_por_loja", nifLogado);
-      const historicoRef = collection(db, "historico");
-
-      let valorCashback = 0;
-
-      if (tipo === 'emissao') {
-        valorCashback = valor * percentagemLoja;
-      } else if (tipo === 'desconto') {
-        const snap = await getDoc(saldoRef);
-        const saldoAtual = snap.exists() ? snap.data().saldoDisponivel : 0;
-        if (saldoAtual < valor) {
-          throw new Error(`Saldo insuficiente! O cliente só tem ${saldoAtual.toFixed(2)}€`);
-        }
-        valorCashback = -valor;
+      
+      if (tipo === 'desconto') {
+        const s = await getDoc(saldoRef);
+        if ((s.data()?.saldoDisponivel || 0) < v) throw new Error("Saldo Insuficiente");
       }
 
-      // Atualiza Saldo
-      await setDoc(saldoRef, {
-        saldoDisponivel: increment(valorCashback),
+      await setDoc(saldoRef, { 
+        saldoDisponivel: increment(valorMov), 
         nomeLoja: lojaData.nome,
-        ultimaAtualizacao: serverTimestamp()
+        ultimoMovimento: serverTimestamp() 
       }, { merge: true });
 
-      // Regista Movimento
-      await addDoc(historicoRef, {
-        clienteId: clientId,
-        lojaId: nifLogado,
-        nomeLoja: lojaData.nome,
-        valorVenda: tipo === 'desconto' ? 0 : valor,
-        valorCashback: valorCashback,
-        tipo: tipo,
-        fatura: numFatura,
-        data: serverTimestamp()
+      await addDoc(collection(db, "historico"), {
+        clienteId: clientId, lojaId: nifLogado, nomeLoja: lojaData.nome,
+        valorVenda: tipo === 'desconto' ? 0 : v,
+        valorCashback: valorMov, tipo, fatura: numFatura, data: serverTimestamp()
       });
 
-      alert("Sucesso!");
+      alert("Operação Concluída!");
       setClientId(''); setValorFatura(''); setNumFatura('');
-      buscarUltimosMovimentos();
-
-    } catch (e) {
-      alert("Erro: " + e.message);
-    }
-    setCarregando(false);
+      buscarHistorico();
+    } catch (e) { alert(e.message); }
+    finally { setCarregando(false); }
   };
 
   if (!isLoggedIn) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
+      <div style={{padding: '50px', textAlign: 'center', fontFamily: 'sans-serif'}}>
         <h1>VizinhoMais</h1>
-        <input id="nif" type="text" placeholder="NIF" style={{ display: 'block', margin: '10px auto', padding: '10px' }} />
-        <input id="pass" type="password" placeholder="Password" style={{ display: 'block', margin: '10px auto', padding: '10px' }} />
-        <button onClick={() => login(document.getElementById('nif').value, document.getElementById('pass').value)} disabled={carregando}>
-          {carregando ? "A entrar..." : "ENTRAR"}
-        </button>
+        <input id="n" type="text" placeholder="NIF" style={{display: 'block', margin: '10px auto', padding: '10px'}} />
+        <input id="p" type="password" placeholder="Password" style={{display: 'block', margin: '10px auto', padding: '10px'}} />
+        <button onClick={() => login(document.getElementById('n').value, document.getElementById('p').value)}>ENTRAR</button>
       </div>
     );
   }
 
   return (
-    <div style={{ fontFamily: 'sans-serif', maxWidth: '600px', margin: 'auto' }}>
-      <header style={{ background: '#eee', padding: '10px', display: 'flex', justifyContent: 'space-around' }}>
-        <button onClick={() => setView('comerciante')}>TERMINAL</button>
-        <button onClick={() => setView('cliente')}>CLIENTE</button>
-        <button onClick={() => setView('relatorio')}>DASHBOARD</button>
-        <button onClick={() => setView('gestor')}>ADMIN</button>
-        <button onClick={() => setIsLoggedIn(false)} style={{ color: 'red' }}>SAIR</button>
-      </header>
+    <div style={{fontFamily: 'sans-serif', maxWidth: '800px', margin: 'auto'}}>
+      <nav style={{display: 'flex', justifyContent: 'space-around', padding: '15px', background: '#2c3e50', color: 'white'}}>
+        <span onClick={() => setView('comerciante')} style={{cursor: 'pointer'}}>TERMINAL</span>
+        <span onClick={() => setView('cliente')} style={{cursor: 'pointer'}}>CLIENTE</span>
+        <span onClick={() => setView('relatorio')} style={{cursor: 'pointer'}}>DASHBOARD</span>
+        <span onClick={() => setView('gestor')} style={{cursor: 'pointer'}}>ADMIN</span>
+        <span onClick={() => setIsLoggedIn(false)} style={{color: '#e74c3c', cursor: 'pointer'}}>SAIR</span>
+      </nav>
 
-      <main style={{ padding: '20px' }}>
-        {view === 'comerciante' && (
+      <div style={{padding: '20px'}}>
+        {view === 'comerciante' ? (
           <div>
-            <h3>{lojaData.nome} (Terminal)</h3>
-            <div style={{ border: '1px solid #ccc', padding: '15px', borderRadius: '8px' }}>
-              <input type="password" placeholder="PIN Comerciante" value={pinComerciante} onChange={e => setPinComerciante(e.target.value)} style={{ width: '100%', marginBottom: '10px', padding: '8px', boxSizing: 'border-box' }} />
-              <input type="text" placeholder="Telemóvel Cliente" value={clientId} onChange={e => setClientId(e.target.value)} style={{ width: '100%', marginBottom: '10px', padding: '8px', boxSizing: 'border-box' }} />
-              <input type="text" placeholder="Fatura Nº" value={numFatura} onChange={e => setNumFatura(e.target.value)} style={{ width: '100%', marginBottom: '10px', padding: '8px', boxSizing: 'border-box' }} />
-              <input type="number" placeholder="Valor (€)" value={valorFatura} onChange={e => setValorFatura(e.target.value)} style={{ width: '100%', marginBottom: '10px', padding: '8px', boxSizing: 'border-box' }} />
-              
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => processarOperacao('emissao')} style={{ flex: 1, padding: '12px', background: 'green', color: 'white', fontWeight: 'bold', border: 'none' }}>EMITIR</button>
-                <button onClick={() => processarOperacao('desconto')} style={{ flex: 1, padding: '12px', background: 'orange', color: 'white', fontWeight: 'bold', border: 'none' }}>DESCONTAR</button>
+            <h2>{lojaData.nome}</h2>
+            <div style={{background: '#f9f9f9', padding: '20px', borderRadius: '10px'}}>
+              <input type="password" placeholder="PIN Comerciante" value={pinComerciante} onChange={e => setPinComerciante(e.target.value)} style={{width: '100%', padding: '10px', marginBottom: '10px'}} />
+              <input type="text" placeholder="Telemóvel Cliente" value={clientId} onChange={e => setClientId(e.target.value)} style={{width: '100%', padding: '10px', marginBottom: '10px'}} />
+              <input type="number" placeholder="Valor (€)" value={valorFatura} onChange={e => setValorFatura(e.target.value)} style={{width: '100%', padding: '10px', marginBottom: '10px'}} />
+              <div style={{display: 'flex', gap: '10px'}}>
+                <button onClick={() => executarOperacao('emissao')} style={{flex: 1, padding: '15px', background: '#27ae60', color: 'white', border: 'none'}}>EMITIR</button>
+                <button onClick={() => executarOperacao('desconto')} style={{flex: 1, padding: '15px', background: '#e67e22', color: 'white', border: 'none'}}>DESCONTAR</button>
               </div>
             </div>
-
-            <h4>Histórico</h4>
-            {historico.map((mov, idx) => (
-              <div key={idx} style={{ borderBottom: '1px solid #eee', padding: '8px', fontSize: '14px' }}>
-                <strong>{mov.tipo === 'emissao' ? '💰' : '🔥'}</strong> {mov.valorCashback.toFixed(2)}€ | Cliente: {mov.clienteId}
+            <h3>Últimos Movimentos</h3>
+            {historico.map((h, i) => (
+              <div key={i} style={{padding: '10px', borderBottom: '1px solid #eee'}}>
+                {h.tipo.toUpperCase()}: {h.valorCashback.toFixed(2)}€ | Cliente: {h.clienteId}
               </div>
             ))}
           </div>
-        )}
-
-        {view === 'cliente' && <Cliente />}
-        {view === 'relatorio' && <Relatorio />}
-        {view === 'gestor' && <Gestor />}
-      </main>
+        ) : view === 'cliente' ? <Cliente /> : view === 'relatorio' ? <Relatorio /> : <Gestor />}
+      </div>
     </div>
   );
 }
