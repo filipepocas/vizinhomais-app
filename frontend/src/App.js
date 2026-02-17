@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { db } from './firebase';
 import { doc, setDoc, increment, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import Cliente from './Cliente';
+import Gestor from './Gestor';
 
 function App() {
 const [view, setView] = useState('comerciante');
@@ -40,7 +41,7 @@ data: serverTimestamp(),
 tipo: tipo
 });
 
-alert(tipo === 'emissao' ? "Cashback Atribuído!" : "Cashback Retirado (Devolução)!");
+alert(tipo === 'emissao' ? "Cashback Atribuído!" : "Cashback Retirado!");
 setClientId('');
 setValorFatura('');
 setNumFatura('');
@@ -51,8 +52,9 @@ return (
 
 <div>
 <nav style={{ background: '#333', padding: '10px', textAlign: 'center' }}>
-<button onClick={() => setView('comerciante')} style={{ marginRight: '10px' }}>Modo Comerciante</button>
-<button onClick={() => setView('cliente')}>Modo Cliente</button>
+<button onClick={() => setView('comerciante')} style={{ color: view === 'comerciante' ? 'yellow' : 'white', marginRight: '10px' }}>Comerciante</button>
+<button onClick={() => setView('cliente')} style={{ color: view === 'cliente' ? 'yellow' : 'white', marginRight: '10px' }}>Cliente</button>
+<button onClick={() => setView('gestor')} style={{ color: view === 'gestor' ? 'yellow' : 'white' }}>Gestor</button>
 </nav>
 
 {view === 'comerciante' ? (
@@ -66,11 +68,13 @@ return (
 
 <div style={{ marginTop: '20px' }}>
 <button onClick={() => movimentarCashback('emissao')} style={{ background: 'green', color: 'white', padding: '15px', marginRight: '10px', border: 'none', borderRadius: '5px' }}>Emitir Cashback</button>
-<button onClick={() => movimentarCashback('devolucao')} style={{ background: 'orange', color: 'white', padding: '15px', border: 'none', borderRadius: '5px' }}>Nota de Crédito (Retirar)</button>
+<button onClick={() => movimentarCashback('devolucao')} style={{ background: 'orange', color: 'white', padding: '15px', border: 'none', borderRadius: '5px' }}>Nota de Crédito</button>
 </div>
 </div>
-) : (
+) : view === 'cliente' ? (
 <Cliente />
+) : (
+<Gestor />
 )}
 </div>
 );

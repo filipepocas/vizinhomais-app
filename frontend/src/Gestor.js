@@ -10,37 +10,42 @@ try {
 const q = query(collection(db, "historico"), orderBy("data", "desc"));
 const snap = await getDocs(q);
 const lista = [];
-snap.forEach((doc) => { lista.push({ id: doc.id, ...doc.data() }); });
+snap.forEach((doc) => {
+const data = doc.data();
+if (data && data.valorCashback !== undefined) {
+lista.push({ id: doc.id, ...data });
+}
+});
 setHistoricoGlobal(lista);
-} catch (e) { console.error(e); }
+} catch (e) { console.error("Erro ao ler dados:", e); }
 };
 
 useEffect(() => { carregarDados(); }, []);
 
 return (
 
-<div style={{ padding: '20px' }}>
-<h1>Painel do Gestor - Auditoria</h1>
-<button onClick={carregarDados} style={{ padding: '10px' }}>Atualizar Dados</button>
-<table style={{ width: '100%', marginTop: '20px', borderCollapse: 'collapse' }}>
+<div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
+<h1>Painel do Gestor - Auditoria Global</h1>
+<button onClick={carregarDados} style={{ padding: '10px', marginBottom: '20px', cursor: 'pointer' }}>Atualizar Dados</button>
+<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
 <thead>
-<tr style={{ background: '#eee' }}>
-<th style={{ border: '1px solid #ddd', padding: '8px' }}>Data</th>
-<th style={{ border: '1px solid #ddd', padding: '8px' }}>Loja</th>
-<th style={{ border: '1px solid #ddd', padding: '8px' }}>Cliente</th>
-<th style={{ border: '1px solid #ddd', padding: '8px' }}>Tipo</th>
-<th style={{ border: '1px solid #ddd', padding: '8px' }}>Valor</th>
+<tr style={{ background: '#333', color: 'white' }}>
+<th style={{ padding: '10px', border: '1px solid #ddd' }}>Data</th>
+<th style={{ padding: '10px', border: '1px solid #ddd' }}>Loja</th>
+<th style={{ padding: '10px', border: '1px solid #ddd' }}>Cliente</th>
+<th style={{ padding: '10px', border: '1px solid #ddd' }}>Tipo</th>
+<th style={{ padding: '10px', border: '1px solid #ddd' }}>Valor</th>
 </tr>
 </thead>
 <tbody>
 {historicoGlobal.map((h) => (
 <tr key={h.id}>
-<td style={{ border: '1px solid #ddd', padding: '8px' }}>{h.data?.toDate().toLocaleString()}</td>
-<td style={{ border: '1px solid #ddd', padding: '8px' }}>{h.nomeLoja}</td>
-<td style={{ border: '1px solid #ddd', padding: '8px' }}>{h.clienteId}</td>
-<td style={{ border: '1px solid #ddd', padding: '8px' }}>{h.tipo}</td>
-<td style={{ border: '1px solid #ddd', padding: '8px', color: h.valorCashback > 0 ? 'green' : 'red' }}>
-{h.valorCashback.toFixed(2)}€
+<td style={{ padding: '10px', border: '1px solid #ddd' }}>{h.data?.toDate().toLocaleString() || '---'}</td>
+<td style={{ padding: '10px', border: '1px solid #ddd' }}>{h.nomeLoja}</td>
+<td style={{ padding: '10px', border: '1px solid #ddd' }}>{h.clienteId}</td>
+<td style={{ padding: '10px', border: '1px solid #ddd' }}>{h.tipo}</td>
+<td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold', color: h.valorCashback > 0 ? 'green' : 'red' }}>
+{Number(h.valorCashback).toFixed(2)}€
 </td>
 </tr>
 ))}
