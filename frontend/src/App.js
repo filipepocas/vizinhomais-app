@@ -17,6 +17,8 @@ function App() {
   const [valorFatura, setValorFatura] = useState('');
   const [numFatura, setNumFatura] = useState('');
   const [pinComerciante, setPinComerciante] = useState('');
+  // 🛡️ NOVO ESTADO: PIN do Cliente
+  const [pinCliente, setPinCliente] = useState(''); 
   const [historico, setHistorico] = useState([]);
 
   useEffect(() => {
@@ -42,7 +44,8 @@ function App() {
   };
 
   const executarOperacao = async (tipo) => {
-    if (pinComerciante !== "1234") { alert("PIN Inválido"); return; }
+    // Validação de segurança básica
+    if (pinComerciante !== "1234") { alert("PIN Comerciante Inválido"); return; }
     if (!clientId || !valorFatura) { alert("Dados incompletos"); return; }
     
     setCarregando(true);
@@ -50,10 +53,15 @@ function App() {
       const v = Number(valorFatura);
       const perc = lojaData.percentagem || 0;
       const valorMov = tipo === 'emissao' ? (v * perc) : -v;
-
       const saldoRef = doc(db, "clientes", clientId, "saldos_por_loja", nifLogado);
       
+      // 🛡️ VALIDAÇÃO DE PIN DO CLIENTE NO DESCONTO
       if (tipo === 'desconto') {
+        if (!pinCliente) { alert("PIN do Cliente é obrigatório para descontar!"); setCarregando(false); return; }
+        // Aqui verificaríamos se o pinCliente corresponde ao cliente no Firestore
+        // Por agora, aceitamos um PIN genérico "9999" para teste
+        if (pinCliente !== "9999") { alert("PIN do Cliente Inválido!"); setCarregando(false); return; }
+        
         const s = await getDoc(saldoRef);
         if ((s.data()?.saldoDisponivel || 0) < v) throw new Error("Saldo Insuficiente");
       }
@@ -71,7 +79,7 @@ function App() {
       });
 
       alert("Operação Concluída!");
-      setClientId(''); setValorFatura(''); setNumFatura('');
+      setClientId(''); setValorFatura(''); setNumFatura(''); setPinCliente('');
       buscarHistorico();
     } catch (e) { alert(e.message); }
     finally { setCarregando(false); }
@@ -101,11 +109,15 @@ function App() {
       <div style={{padding: '20px'}}>
         {view === 'comerciante' ? (
           <div>
-            <h2>{lojaData.nome}</h2>
+            <h2>{lojaData.nome} (Terminal)</h2>
             <div style={{background: '#f9f9f9', padding: '20px', borderRadius: '10px'}}>
               <input type="password" placeholder="PIN Comerciante" value={pinComerciante} onChange={e => setPinComerciante(e.target.value)} style={{width: '100%', padding: '10px', marginBottom: '10px'}} />
               <input type="text" placeholder="Telemóvel Cliente" value={clientId} onChange={e => setClientId(e.target.value)} style={{width: '100%', padding: '10px', marginBottom: '10px'}} />
-              <input type="number" placeholder="Valor (€)" value={valorFatura} onChange={e => setValorFatura(e.target.value)} style={{width: '100%', padding: '10px', marginBottom: '10px'}} />
+              <input type="number" placeholder="Valor da Fatura (€)" value={valorFatura} onChange={e => setValorFatura(e.target.value)} style={{width: '100%', padding: '10px', marginBottom: '10px'}} />
+              
+              {/* 🛡️ INPUT PARA PIN DO CLIENTE */}
+              <input type="password" placeholder="PIN Cliente (para descontar)" value={pinCliente} onChange={e => setPinCliente(e.target.value)} style={{width: '100%', padding: '10px', marginBottom: '10px', background: '#fff3cd'}} />
+              
               <div style={{display: 'flex', gap: '10px'}}>
                 <button onClick={() => executarOperacao('emissao')} style={{flex: 1, padding: '15px', background: '#27ae60', color: 'white', border: 'none'}}>EMITIR</button>
                 <button onClick={() => executarOperacao('desconto')} style={{flex: 1, padding: '15px', background: '#e67e22', color: 'white', border: 'none'}}>DESCONTAR</button>
