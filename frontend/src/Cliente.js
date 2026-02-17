@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { db } from './firebase';
 import { collection, query, where, getDocs } from "firebase/firestore";
 
@@ -18,13 +18,14 @@ const agora = new Date();
 
 snap.forEach((doc) => {
 const trans = doc.data();
-const dataTrans = trans.data.toDate();
+const dataTrans = trans.data.toDate(); // Converte timestamp do Firebase
 const diasPassados = (agora - dataTrans) / (1000 * 60 * 60 * 24);
 
 if (!resumoPorLoja[trans.lojaId]) {
 resumoPorLoja[trans.lojaId] = { nomeLoja: trans.nomeLoja, disponivel: 0, pendente: 0 };
 }
 
+// Lógica de carência: 2 dias
 if (diasPassados >= 2) {
 resumoPorLoja[trans.lojaId].disponivel += trans.valorCashback;
 } else {
@@ -40,12 +41,12 @@ return (
 
 <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
 <h1>Área do Cliente</h1>
-<div style={{ marginBottom: '20px' }}>
+<div style={{ marginBottom: '20px', background: '#eee', padding: '15px', borderRadius: '5px' }}>
 <input type="text" placeholder="Telemóvel do Cliente" value={clienteId} onChange={(e) => setClienteId(e.target.value)} style={{ padding: '10px', width: '200px' }} />
-<button onClick={verificarSaldo} style={{ padding: '10px', marginLeft: '10px' }}>Ver Saldo</button>
+<button onClick={verificarSaldo} style={{ padding: '10px', marginLeft: '10px', background: 'blue', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>Ver Saldo</button>
 </div>
 
-{carregando ? <p>A calcular saldos...</p> : (
+{carregando ? <p>A carregar saldos...</p> : (
 
 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
 <thead>
