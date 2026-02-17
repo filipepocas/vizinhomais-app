@@ -6,7 +6,7 @@ function Gestor() {
 const [lojas, setLojas] = useState([]);
 const [nomeLoja, setNomeLoja] = useState('');
 const [nif, setNif] = useState('');
-const [percentagem, setPercentagem] = useState('10');
+const [percentagem, setPercentagem] = useState(10); // Valor padrão 10%
 const [codigoPostal, setCodigoPostal] = useState('');
 
 const carregarLojas = async () => {
@@ -18,13 +18,15 @@ setLojas(lista);
 
 const registarLoja = async () => {
 if (!nomeLoja || !nif || !codigoPostal) { alert("Preencha todos os campos!"); return; }
+if (percentagem < 1 || percentagem > 50) { alert("O cashback deve ser entre 1% e 50%"); return; }
+
 try {
 await setDoc(doc(db, "comerciantes", nif), {
 nome: nomeLoja,
 nif: nif,
 percentagem: Number(percentagem) / 100,
 codigoPostal: codigoPostal,
-utilizadores: [nif] // Exemplo: password inicial é o NIF
+utilizadores: [nif]
 });
 alert("Loja registada com sucesso!");
 carregarLojas();
@@ -40,15 +42,16 @@ return (
 <h1>Painel Admin - Registo de Comerciantes</h1>
 <div style={{ background: '#eee', padding: '20px', borderRadius: '10px', marginBottom: '20px' }}>
 <h3>Nova Loja</h3>
-<input type="text" placeholder="Nome da Loja" value={nomeLoja} onChange={(e) => setNomeLoja(e.target.value)} style={{marginRight: '10px'}}/>
-<input type="text" placeholder="NIF" value={nif} onChange={(e) => setNif(e.target.value)} style={{marginRight: '10px'}}/>
-<input type="text" placeholder="Código Postal" value={codigoPostal} onChange={(e) => setCodigoPostal(e.target.value)} style={{marginRight: '10px'}}/>
-<select value={percentagem} onChange={(e) => setPercentagem(e.target.value)}>
-<option value="5">5%</option>
-<option value="10">10%</option>
-<option value="15">15%</option>
-</select>
-<button onClick={registarLoja} style={{marginLeft: '10px', background: 'blue', color: 'white'}}>Registar</button>
+<input type="text" placeholder="Nome da Loja" value={nomeLoja} onChange={(e) => setNomeLoja(e.target.value)} style={{marginRight: '10px', padding: '5px'}}/>
+<input type="text" placeholder="NIF" value={nif} onChange={(e) => setNif(e.target.value)} style={{marginRight: '10px', padding: '5px'}}/>
+<input type="text" placeholder="Código Postal" value={codigoPostal} onChange={(e) => setCodigoPostal(e.target.value)} style={{marginRight: '10px', padding: '5px'}}/>
+
+
+
+
+<label>Percentagem Cashback (1 a 50%): </label>
+<input type="number" min="1" max="50" value={percentagem} onChange={(e) => setPercentagem(e.target.value)} style={{padding: '5px', width: '60px'}} /> %
+<button onClick={registarLoja} style={{marginLeft: '20px', background: 'blue', color: 'white', padding: '10px', border: 'none', borderRadius: '5px', cursor: 'pointer'}}>Registar Loja</button>
 </div>
 
 <h3>Lojas Registadas</h3>
