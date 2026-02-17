@@ -20,20 +20,21 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [nifLogado, setNifLogado] = useState(null);
 
-  // Busca o histórico da loja logada
   useEffect(() => {
     if (!isLoggedIn || !nifLogado) return;
     const buscarHistorico = async () => {
-      const q = query(
-        collection(db, "historico"),
-        where("lojaId", "==", nifLogado),
-        orderBy("data", "desc"),
-        limit(5)
-      );
-      const snap = await getDocs(q);
-      const lista = [];
-      snap.forEach((doc) => lista.push(doc.data()));
-      setHistorico(lista);
+      try {
+        const q = query(
+          collection(db, "historico"),
+          where("lojaId", "==", nifLogado),
+          orderBy("data", "desc"),
+          limit(5)
+        );
+        const snap = await getDocs(q);
+        const lista = [];
+        snap.forEach((doc) => lista.push(doc.data()));
+        setHistorico(lista);
+      } catch (e) { console.error("Erro no historico:", e); }
     };
     buscarHistorico();
   }, [isLoggedIn, nifLogado]);
@@ -50,7 +51,6 @@ function App() {
           setLojaData(dados);
           setNifLogado(loginNif);
           setIsLoggedIn(true);
-          setLoginPass('');
         } else { alert("Password incorreta!"); }
       } else { alert("NIF não encontrado!"); }
     } catch (e) { alert("Erro: " + e.message); }
@@ -61,84 +61,48 @@ function App() {
     setIsLoggedIn(false);
     setLojaData(null);
     setNifLogado(null);
-    setLoginNif('');
-    setLoginPass('');
     setView('comerciante');
-  };
-
-  const movimentarCashback = async (tipo) => {
-    if (pin !== "1234") { alert("PIN incorreto!"); return; }
-    if (!clientId || !valorFatura || !lojaData) { alert("Dados incompletos!"); return; }
-    setCarregando(true);
-    try {
-      const valorBase = Number(valorFatura);
-      const perc = lojaData.percentagem || 0;
-      const valorCashback = tipo === 'emissao' ? (valorBase * perc) : -(valorBase * perc);
-      
-      const saldoRef = doc(db, "clientes", clientId, "saldos_por_loja", nifLogado);
-      await setDoc(saldoRef, { saldoDisponivel: increment(valorCashback), nomeLoja: lojaData.nome }, { merge: true });
-      
-      await addDoc(collection(db, "historico"), {
-        clienteId: clientId, lojaId: nifLogado, nomeLoja: lojaData.nome, fatura: numFatura,
-        valorVenda: valorBase, valorCashback: valorCashback, data: serverTimestamp(), tipo: tipo
-      });
-      
-      alert("Operação concluída!");
-      setClientId(''); setValorFatura(''); setNumFatura('');
-      
-      // Atualiza o histórico localmente
-      const q = query(collection(db, "historico"), where("lojaId", "==", nifLogado), orderBy("data", "desc"), limit(5));
-      const snap = await getDocs(q);
-      const lista = [];
-      snap.forEach((doc) => lista.push(doc.data()));
-      setHistorico(lista);
-
-    } catch (e) { alert("Erro: " + e.message); }
-    finally { setCarregando(false); }
   };
 
   if (!isLoggedIn) {
     return (
-      <div>
-        <h2>Login</h2>
-        <input type="text" placeholder="NIF" value={loginNif} onChange={(e) => setLoginNif(e.target.value)} />
-        <input type="password" placeholder="Password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} />
-        <button onClick={autenticarComerciante} disabled={carregando}>{carregando ? "..." : "ENTRAR"}</button>
+      <div style={{padding: '20px'}}>
+        <h2>Login Comerciante</h2>
+        <input type="text" placeholder="NIF" value={loginNif} onChange={(e) => setLoginNif(e.target.value)} /><br/>
+        <input type="password" placeholder="Password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} /><br/>
+        <button onClick={autenticarComerciante} disabled={carregando}>ENTRAR</button>
       </div>
     );
   }
 
   return (
-    <div>
-      <nav>
+    <div style={{padding: '10px', fontFamily: 'sans-serif'}}>
+      <nav style={{marginBottom: '20px', borderBottom: '1px solid #ccc', paddingBottom: '10px'}}>
         <button onClick={() => setView('comerciante')}>LOJA</button>
         <button onClick={() => setView('cliente')}>CLIENTE</button>
+        <button onClick={() => setView('relatorio')}>RELATÓRIOS</button>
         <button onClick={() => setView('gestor')}>ADMIN</button>
-        <button onClick={fazerLogout}>Sair</button>
+        <button onClick={fazerLogout} style={{color: 'red', marginLeft: '10px'}}>SAIR</button>
       </nav>
       
       <div>
         {view === 'comerciante' ? (
           <div>
-            <h2>Terminal: {lojaData.nome}</h2>
-            <p>NIF: {nifLogado} | Cashback: {(lojaData.percentagem * 100).toFixed(0)}%</p>
-            <input type="password" placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} />
-            <input type="text" placeholder="Telemóvel" value={clientId} onChange={(e) => setClientId(e.target.value)} />
-            <input type="text" placeholder="Fatura" value={numFatura} onChange={(e) => setNumFatura(e.target.value)} />
-            <input type="number" placeholder="Valor (€)" value={valorFatura} onChange={(e) => setValorFatura(e.target.value)} />
-            <button onClick={() => movimentarCashback('emissao')} disabled={carregando}>EMITIR</button>
-            <button onClick={() => movimentarCashback('devolucao')} disabled={carregando}>DEVOLUÇÃO</button>
+            <h2>Terminal: {lojaData?.nome}</h2>
+            <input type="password" placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} /><br/>
+            <input type="text" placeholder="Telemóvel" value={clientId} onChange={(e) => setClientId(e.target.value)} /><br/>
+            <input type="text" placeholder="Fatura" value={numFatura} onChange={(e) => setNumFatura(e.target.value)} /><br/>
+            <input type="number" placeholder="Valor (€)" value={valorFatura} onChange={(e) => setValorFatura(e.target.value)} /><br/>
+            <button onClick={() => alert("Função Emitir")}>EMITIR</button>
             
-            <h3>Últimos Movimentos</h3>
+            <h3>Últimos 5 Movimentos</h3>
             {historico.map((h, i) => (
-              <p key={i}>
-                {h.tipo === 'emissao' ? '➕' : '➖'} 
-                {h.valorCashback.toFixed(2)}€ - Fatura {h.fatura} 
-                ({h.data ? h.data.toDate().toLocaleDateString() : 'agora'})
-              </p>
+              <p key={i}>{h.tipo === 'emissao' ? '➕' : '➖'} {h.valorCashback.toFixed(2)}€ (Fat: {h.fatura})</p>
             ))}
           </div>
-        ) : view === 'cliente' ? <Cliente /> : <Gestor />}
+        ) : view === 'cliente' ? <Cliente /> 
+          : view === 'relatorio' ? <Relatorio /> 
+          : <Gestor />}
       </div>
     </div>
   );
