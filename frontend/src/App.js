@@ -14,27 +14,28 @@ const [pin, setPin] = useState('');
 const [carregando, setCarregando] = useState(false);
 const [lojaData, setLojaData] = useState(null);
 
-// MESTRE: O NIF da loja que está a usar o terminal
+// NIF da loja de teste - Garante que este NIF existe no teu Gestor!
 const NIF_LOJA = "123456789";
 
 useEffect(() => {
 const buscarDadosLoja = async () => {
+try {
 const docRef = doc(db, "comerciantes", NIF_LOJA);
 const docSnap = await getDoc(docRef);
 if (docSnap.exists()) {
 setLojaData(docSnap.data());
 }
+} catch (e) { console.error("Erro ao carregar loja:", e); }
 };
 buscarDadosLoja();
 }, []);
 
 const movimentarCashback = async (tipo) => {
 if (pin !== "1234") { alert("PIN incorreto!"); return; }
-if (!clientId || !valorFatura || !numFatura || !lojaData) { alert("Dados incompletos ou loja não carregada!"); return; }
+if (!clientId || !valorFatura || !numFatura || !lojaData) { alert("Dados incompletos!"); return; }
 
 setCarregando(true);
 const valorBase = Number(valorFatura);
-// USA O % DA LOJA ARMAZENADO NO FIRESTORE
 const valorCashback = tipo === 'emissao' ? (valorBase * lojaData.percentagem) : -(valorBase * lojaData.percentagem);
 
 try {
@@ -55,9 +56,9 @@ data: serverTimestamp(),
 tipo: tipo
 });
 
-alert(tipo === 'emissao' ? "Cashback Atribuído com sucesso!" : "Devolução registada!");
+alert("Operação concluída!");
 setClientId(''); setValorFatura(''); setNumFatura('');
-} catch (e) { alert("Erro ao processar!"); }
+} catch (e) { alert("Erro de ligação."); }
 finally { setCarregando(false); }
 };
 
@@ -74,19 +75,19 @@ return (
 <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
 {view === 'comerciante' ? (
 <div style={{ background: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-<h2>{lojaData ? Terminal: ${lojaData.nome} : "Carregando Loja..."}</h2>
-<p style={{color: 'gray'}}>Percentagem de Cashback: {lojaData ? (lojaData.percentagem * 100) : 0}%</p>
-<input type="password" placeholder="PIN de Segurança" value={pin} onChange={(e) => setPin(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '80%' }} />
+<h2>{lojaData ? 'Terminal: ' + lojaData.nome : "Carregando Loja..."}</h2>
+<p style={{color: 'gray'}}>Percentagem ativa: {lojaData ? (lojaData.percentagem * 100).toFixed(0) : 0}%</p>
+<input type="password" placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '80%' }} />
 <hr />
 <input type="text" placeholder="Telemóvel do Cliente" value={clientId} onChange={(e) => setClientId(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '80%' }} />
-<input type="text" placeholder="Nº Fatura / Nota Crédito" value={numFatura} onChange={(e) => setNumFatura(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '80%' }} />
-<input type="number" placeholder="Valor Total (€)" value={valorFatura} onChange={(e) => setValorFatura(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '80%' }} />
+<input type="text" placeholder="Fatura" value={numFatura} onChange={(e) => setNumFatura(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '80%' }} />
+<input type="number" placeholder="Valor (€)" value={valorFatura} onChange={(e) => setValorFatura(e.target.value)} style={{ display: 'block', margin: '10px auto', padding: '10px', width: '80%' }} />
 
 <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
-<button onClick={() => movimentarCashback('emissao')} disabled={carregando} style={{ background: 'green', color: 'white', padding: '15px 30px', border: 'none', borderRadius: '5px', opacity: carregando ? 0.5 : 1 }}>
+<button onClick={() => movimentarCashback('emissao')} disabled={carregando} style={{ background: 'green', color: 'white', padding: '15px', borderRadius: '5px' }}>
 {carregando ? "A processar..." : "EMITIR CASHBACK"}
 </button>
-<button onClick={() => movimentarCashback('devolucao')} disabled={carregando} style={{ background: '#e67e22', color: 'white', padding: '15px 30px', border: 'none', borderRadius: '5px', opacity: carregando ? 0.5 : 1 }}>
+<button onClick={() => movimentarCashback('devolucao')} disabled={carregando} style={{ background: '#e67e22', color: 'white', padding: '15px', borderRadius: '5px' }}>
 DEVOLUÇÃO
 </button>
 </div>
