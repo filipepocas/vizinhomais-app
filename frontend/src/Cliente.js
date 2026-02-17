@@ -7,6 +7,7 @@ const [id, setId] = useState(localStorage.getItem('clienteId') || '');
 const [saldos, setSaldos] = useState([]);
 const [historico, setHistorico] = useState([]);
 const [valorDesconto, setValorDesconto] = useState('');
+const [pinCliente, setPinCliente] = useState('');
 
 const consultarDados = async () => {
 if (!id) return;
@@ -31,6 +32,7 @@ const utilizarSaldo = async (lojaId, nomeLoja, saldoAtual) => {
 const valor = Number(valorDesconto);
 if (!valor || valor <= 0) { alert("Valor inválido!"); return; }
 if (valor > saldoAtual) { alert("Saldo insuficiente!"); return; }
+if (pinCliente !== "9999") { alert("PIN de Cliente incorreto! (Teste: 9999)"); return; }
 
 try {
 const saldoRef = doc(db, "clientes", id, "saldos_por_loja", lojaId);
@@ -47,33 +49,35 @@ data: serverTimestamp(),
 tipo: "utilizacao"
 });
 
-alert("Saldo de " + valor + "€ utilizado com sucesso!");
+alert("Sucesso! Desconto de " + valor + "€ aplicado.");
 setValorDesconto('');
+setPinCliente('');
 consultarDados();
-} catch (e) { alert("Erro ao utilizar saldo."); }
+} catch (e) { alert("Erro na operação."); }
 };
 
 useEffect(() => { if (id) { consultarDados(); } }, []);
 
 return (
 
-<div style={{ textAlign: 'center', marginTop: '50px', padding: '20px' }}>
+<div style={{ textAlign: 'center', marginTop: '50px', padding: '20px', fontFamily: 'sans-serif' }}>
 <h1>O Meu Cartão VizinhoMais</h1>
-<input value={id} onChange={(e) => setId(e.target.value)} placeholder="ID do Cliente" style={{ padding: '10px' }} />
-<button onClick={consultarDados} style={{ padding: '10px', marginLeft: '5px' }}>Ver Saldos</button>
+<input value={id} onChange={(e) => setId(e.target.value)} placeholder="Telemóvel do Cliente" style={{ padding: '10px' }} />
+<button onClick={consultarDados} style={{ padding: '10px', marginLeft: '5px' }}>Ver Meus Cartões</button>
 
 <div style={{ marginTop: '30px' }}>
 {saldos.length > 0 ? (
 saldos.map((s) => (
-<div key={s.id} style={{ border: '2px solid #333', borderRadius: '10px', padding: '15px', margin: '10px auto', maxWidth: '300px', backgroundColor: '#f9f9f9' }}>
-<h2 style={{ margin: '0' }}>{s.nomeLoja}</h2>
-<p style={{ fontSize: '20px', fontWeight: 'bold', color: 'green' }}>{s.saldoDisponivel.toFixed(2)}€ em saldo</p>
-<input type="number" placeholder="Valor a descontar" onChange={(e) => setValorDesconto(e.target.value)} style={{ width: '80%', padding: '5px', marginBottom: '5px' }} />
-<button onClick={() => utilizarSaldo(s.id, s.nomeLoja, s.saldoDisponivel)} style={{ background: '#333', color: 'white', padding: '5px 10px', border: 'none', borderRadius: '5px' }}>Utilizar Saldo</button>
+<div key={s.id} style={{ border: '2px solid #333', borderRadius: '15px', padding: '15px', margin: '15px auto', maxWidth: '300px', backgroundColor: '#fff', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
+<h2 style={{ margin: '0', color: '#333' }}>{s.nomeLoja}</h2>
+<p style={{ fontSize: '24px', fontWeight: 'bold', color: 'green' }}>{s.saldoDisponivel.toFixed(2)}€</p>
+<input type="number" placeholder="Valor a gastar" onChange={(e) => setValorDesconto(e.target.value)} style={{ width: '90%', padding: '8px', marginBottom: '10px' }} />
+<input type="password" placeholder="Teu PIN (9999)" onChange={(e) => setPinCliente(e.target.value)} style={{ width: '90%', padding: '8px', marginBottom: '10px' }} />
+<button onClick={() => utilizarSaldo(s.id, s.nomeLoja, s.saldoDisponivel)} style={{ background: '#e67e22', color: 'white', padding: '10px 20px', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' }}>Utilizar Saldo Agora</button>
 </div>
 ))
 ) : (
-<p>Ainda não tens saldos acumulados.</p>
+<p style={{ color: '#666' }}>Ainda não tens saldos nesta loja.</p>
 )}
 </div>
 </div>
