@@ -12,6 +12,7 @@ const snap = await getDocs(q);
 const lista = [];
 snap.forEach((doc) => {
 const data = doc.data();
+// Proteção: Só adiciona se o valorCashback existir
 if (data && data.valorCashback !== undefined) {
 lista.push({ id: doc.id, ...data });
 }

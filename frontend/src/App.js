@@ -3,6 +3,7 @@ import { db } from './firebase';
 import { doc, setDoc, increment, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import Cliente from './Cliente';
 import Gestor from './Gestor';
+import Relatorio from './Relatorio'; // Importa o novo componente
 
 function App() {
 const [view, setView] = useState('comerciante');
@@ -54,7 +55,8 @@ return (
 <nav style={{ background: '#333', padding: '10px', textAlign: 'center' }}>
 <button onClick={() => setView('comerciante')} style={{ color: view === 'comerciante' ? 'yellow' : 'white', marginRight: '10px' }}>Comerciante</button>
 <button onClick={() => setView('cliente')} style={{ color: view === 'cliente' ? 'yellow' : 'white', marginRight: '10px' }}>Cliente</button>
-<button onClick={() => setView('gestor')} style={{ color: view === 'gestor' ? 'yellow' : 'white' }}>Gestor</button>
+<button onClick={() => setView('gestor')} style={{ color: view === 'gestor' ? 'yellow' : 'white', marginRight: '10px' }}>Gestor</button>
+<button onClick={() => setView('relatorio')} style={{ color: view === 'relatorio' ? 'yellow' : 'white' }}>Relatório</button>
 </nav>
 
 {view === 'comerciante' ? (
@@ -73,8 +75,10 @@ return (
 </div>
 ) : view === 'cliente' ? (
 <Cliente />
-) : (
+) : view === 'gestor' ? (
 <Gestor />
+) : (
+<Relatorio />
 )}
 </div>
 );
