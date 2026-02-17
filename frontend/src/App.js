@@ -24,27 +24,22 @@ try {
 const saldoRef = doc(db, "clientes", clientId, "saldos_por_loja", LOJA_ID);
 await setDoc(saldoRef, {
 saldoDisponivel: increment(valorCashback),
-nomeLoja: NOME_LOJA,
-ultimaAtualizacao: serverTimestamp()
+nomeLoja: NOME_LOJA
 }, { merge: true });
 
 await addDoc(collection(db, "historico"), {
 clienteId: clientId,
 lojaId: LOJA_ID,
 nomeLoja: NOME_LOJA,
-valorVenda: Number(valorVenda),
 valorCashback: valorCashback,
 data: serverTimestamp(),
-disponivelEm: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
 tipo: "emissao"
 });
 
-alert("Cashback de " + valorCashback.toFixed(2) + "€ registado para esta loja!");
+alert("Cashback de " + valorCashback.toFixed(2) + "€ registado!");
 setClientId('');
 setValorVenda('');
-} catch (e) {
-alert("Erro no sistema!");
-}
+} catch (e) { alert("Erro!"); }
 };
 
 return (
