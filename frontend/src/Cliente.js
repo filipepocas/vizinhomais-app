@@ -1,74 +1,92 @@
 import React, { useState } from 'react';
 import { db } from './firebase';
-import { collection, getDocs, query, where, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 
-function Cliente() {
+function Cliente({ voltar }) {
   const [tel, setTel] = useState('');
-  const [saldos, setSaldos] = useState([]);
   const [perfil, setPerfil] = useState(null);
-  const [novoPin, setNovoPin] = useState('');
+  const [saldos, setSaldos] = useState([]);
+  const [isRegisto, setIsRegisto] = useState(false);
+  const [regData, setRegData] = useState({ nome: '', cp: '', email: '' });
 
-  const entrarOuRegistar = async () => {
-    if (!tel || tel.length < 9) { alert("Insira um telemóvel válido."); return; }
-    
-    try {
-      const cRef = doc(db, "clientes", tel);
-      const cSnap = await getDoc(cRef);
-
-      if (!cSnap.exists()) {
-        if (window.confirm("Telemóvel não encontrado. Deseja criar conta com PIN 0000?")) {
-          await setDoc(cRef, { pin: "0000", criadoEm: new Date() });
-          alert("Conta criada! O seu PIN inicial é 0000.");
-          setPerfil({ pin: "0000" });
-        } else return;
-      } else {
-        setPerfil(cSnap.data());
-      }
-
-      const hSnap = await getDocs(query(collection(db, "historico"), where("clienteId", "==", tel)));
-      const agora = Date.now();
-      let mapa = {};
-
-      hSnap.forEach(d => {
-        const m = d.data();
-        if (!mapa[m.lojaId]) mapa[m.lojaId] = { nome: m.nomeLoja, disponivel: 0, pendente: 0 };
-        if (m.tipo === 'emissao') {
-          if (m.disponivelEm <= agora) mapa[m.lojaId].disponivel += m.valorCashback;
-          else mapa[m.lojaId].pendente += m.valorCashback;
-        } else {
-          mapa[m.lojaId].disponivel -= Math.abs(m.valorCashback);
-        }
-      });
-      setSaldos(Object.entries(mapa));
-    } catch (e) { alert("Erro ao aceder aos dados."); }
+  const entrar = async () => {
+    const cSnap = await getDoc(doc(db, "clientes", tel));
+    if (cSnap.exists()) {
+      setPerfil(cSnap.data());
+      carregarSaldos();
+    } else {
+      setIsRegisto(true);
+    }
   };
 
-  return (
-    <div style={{fontFamily:'sans-serif'}}>
-      <h2>Minha Carteira VizinhoMais</h2>
-      <input type="text" placeholder="Telemóvel" value={tel} onChange={e=>setTel(e.target.value)} style={{padding:'10px', width:'60%'}}/>
-      <button onClick={entrarOuRegistar} style={{padding:'10px'}}>ENTRAR / REGISTAR</button>
+  const registar = async () => {
+    await setDoc(doc(db, "clientes", tel), { ...regData, tel, criadoEm: new Date() });
+    alert("Conta criada com sucesso!");
+    setPerfil({ ...regData, tel });
+    carregarSaldos();
+  };
 
-      {perfil && (
-        <div style={{marginTop:'20px', padding:'15px', background:'#f0f0f0', borderRadius:'8px'}}>
-          <p>Seu PIN: <strong>{perfil.pin}</strong> (Use para descontar em loja)</p>
-          <input type="password" placeholder="Novo PIN" value={novoPin} onChange={e=>setNovoPin(e.target.value)} maxLength={4} style={{padding:'5px'}}/>
-          <button onClick={async ()=>{if(novoPin.length===4){await updateDoc(doc(db,"clientes",tel),{pin:novoPin}); alert("PIN Alterado!");} else alert("PIN deve ter 4 dígitos");}}>Mudar PIN</button>
+  const carregarSaldos = async () => {
+    const hSnap = await getDocs(query(collection(db, "historico"), where("clienteId", "==", tel)));
+    const agora = Date.now();
+    let mapa = {};
+    hSnap.forEach(d => {
+      const m = d.data();
+      if (!mapa[m.lojaId]) mapa[m.lojaId] = { nome: m.nomeLoja, disp: 0, pend: 0 };
+      if (m.tipo === 'compra') {
+        if (m.disponivelEm <= agora) mapa[m.lojaId].disp += m.valorCashback;
+        else mapa[m.lojaId].pend += m.valorCashback;
+      } else if (m.tipo === 'devolucao' || m.tipo === 'desconto') {
+        mapa[m.lojaId].disp += m.valorCashback;
+      }
+    });
+    setSaldos(Object.entries(mapa));
+  };
+
+  if (isRegisto && !perfil) {
+    return (
+      <div style={{padding:'20px'}}>
+        <h3>Criar Conta VizinhoMais</h3>
+        <input placeholder="Nome Completo" onChange={e=>setRegData({...regData, nome:e.target.value})} style={inputStyle}/>
+        <input placeholder="Código Postal" onChange={e=>setRegData({...regData, cp:e.target.value})} style={inputStyle}/>
+        <input placeholder="Email (Opcional)" onChange={e=>setRegData({...regData, email:e.target.value})} style={inputStyle}/>
+        <button onClick={registar} style={btnStyle}>CRIAR CARTÃO DIGITAL</button>
+      </div>
+    );
+  }
+
+  if (perfil) {
+    return (
+      <div style={{padding:'20px', textAlign:'center'}}>
+        <button onClick={voltar}>Sair</button>
+        <div style={{border:'2px solid #333', padding:'20px', borderRadius:'15px', margin:'20px 0', background:'#fff'}}>
+          <h2 style={{margin:0}}>CARTÃO VIZINHO</h2>
+          <p>{perfil.nome}</p>
+          <div style={{background:'#000', height:'60px', width:'100%', marginTop:'10px'}}></div>
+          <small>{tel}</small>
         </div>
-      )}
-
-      <h3>Saldos por Loja:</h3>
-      {saldos.map(([id, info]) => (
-        <div key={id} style={{border:'1px solid #ddd', padding:'15px', margin:'10px 0', borderRadius:'10px'}}>
-          <div style={{display:'flex', justifyContent:'space-between'}}>
-            <strong>{info.nome}</strong>
-            <span style={{color:'green', fontWeight:'bold'}}>{info.disponivel.toFixed(2)}€</span>
+        <h4>Saldos por Loja:</h4>
+        {saldos.map(([id, info]) => (
+          <div key={id} style={{borderBottom:'1px solid #eee', padding:'10px', textAlign:'left'}}>
+            <strong>{info.nome}</strong>: <span style={{color:'green'}}>{info.disp.toFixed(2)}€</span>
+            {info.pend > 0 && <div style={{fontSize:'11px', color:'orange'}}>Pendente: {info.pend.toFixed(2)}€</div>}
           </div>
-          {info.pendente > 0 && <small style={{color:'orange'}}>A libertar em 2 dias: {info.pendente.toFixed(2)}€</small>}
-        </div>
-      ))}
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{padding:'20px', textAlign:'center'}}>
+      <button onClick={voltar}>← Voltar</button>
+      <h3>Entrar na Minha Carteira</h3>
+      <input placeholder="Telemóvel" value={tel} onChange={e=>setTel(e.target.value)} style={inputStyle}/>
+      <button onClick={entrar} style={btnStyle}>ACEDER</button>
     </div>
   );
 }
+
+const btnStyle = { width: '100%', padding: '15px', background: '#3498db', color: 'white', border: 'none', borderRadius: '5px' };
+const inputStyle = { display: 'block', width: '100%', padding: '10px', marginBottom: '10px', boxSizing: 'border-box' };
 
 export default Cliente;
