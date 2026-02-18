@@ -17,7 +17,6 @@ function App() {
   const [valorFatura, setValorFatura] = useState('');
   const [numFatura, setNumFatura] = useState('');
   const [pinComerciante, setPinComerciante] = useState('');
-  // 🛡️ NOVO ESTADO: PIN do Cliente
   const [pinCliente, setPinCliente] = useState(''); 
   const [historico, setHistorico] = useState([]);
 
@@ -44,7 +43,6 @@ function App() {
   };
 
   const executarOperacao = async (tipo) => {
-    // Validação de segurança básica
     if (pinComerciante !== "1234") { alert("PIN Comerciante Inválido"); return; }
     if (!clientId || !valorFatura) { alert("Dados incompletos"); return; }
     
@@ -53,19 +51,29 @@ function App() {
       const v = Number(valorFatura);
       const perc = lojaData.percentagem || 0;
       const valorMov = tipo === 'emissao' ? (v * perc) : -v;
-      const saldoRef = doc(db, "clientes", clientId, "saldos_por_loja", nifLogado);
       
-      // 🛡️ VALIDAÇÃO DE PIN DO CLIENTE NO DESCONTO
+      // 🛡️ VALIDAÇÃO DE PIN REAL DO CLIENTE
       if (tipo === 'desconto') {
-        if (!pinCliente) { alert("PIN do Cliente é obrigatório para descontar!"); setCarregando(false); return; }
-        // Aqui verificaríamos se o pinCliente corresponde ao cliente no Firestore
-        // Por agora, aceitamos um PIN genérico "9999" para teste
-        if (pinCliente !== "9999") { alert("PIN do Cliente Inválido!"); setCarregando(false); return; }
+        if (!pinCliente) { alert("PIN do Cliente é obrigatório!"); setCarregando(false); return; }
         
+        const clientSnap = await getDoc(doc(db, "clientes", clientId));
+        if (!clientSnap.exists()) {
+          alert("Cliente não encontrado!"); setCarregando(false); return;
+        }
+        
+        const pinNoSistema = clientSnap.data().pin;
+        if (String(pinCliente) !== String(pinNoSistema)) {
+          alert("PIN do Cliente Incorreto!"); setCarregando(false); return;
+        }
+
+        // Verificar saldo disponível na sub-coleção
+        const saldoRef = doc(db, "clientes", clientId, "saldos_por_loja", nifLogado);
         const s = await getDoc(saldoRef);
-        if ((s.data()?.saldoDisponivel || 0) < v) throw new Error("Saldo Insuficiente");
+        if ((s.data()?.saldoDisponivel || 0) < v) throw new Error("Saldo Insuficiente nesta loja");
       }
 
+      // Executar a transação
+      const saldoRef = doc(db, "clientes", clientId, "saldos_por_loja", nifLogado);
       await setDoc(saldoRef, { 
         saldoDisponivel: increment(valorMov), 
         nomeLoja: lojaData.nome,
@@ -78,7 +86,7 @@ function App() {
         valorCashback: valorMov, tipo, fatura: numFatura, data: serverTimestamp()
       });
 
-      alert("Operação Concluída!");
+      alert("Sucesso!");
       setClientId(''); setValorFatura(''); setNumFatura(''); setPinCliente('');
       buscarHistorico();
     } catch (e) { alert(e.message); }
@@ -109,26 +117,23 @@ function App() {
       <div style={{padding: '20px'}}>
         {view === 'comerciante' ? (
           <div>
-            <h2>{lojaData.nome} (Terminal)</h2>
-            <div style={{background: '#f9f9f9', padding: '20px', borderRadius: '10px'}}>
-              <input type="password" placeholder="PIN Comerciante" value={pinComerciante} onChange={e => setPinComerciante(e.target.value)} style={{width: '100%', padding: '10px', marginBottom: '10px'}} />
-              <input type="text" placeholder="Telemóvel Cliente" value={clientId} onChange={e => setClientId(e.target.value)} style={{width: '100%', padding: '10px', marginBottom: '10px'}} />
-              <input type="number" placeholder="Valor da Fatura (€)" value={valorFatura} onChange={e => setValorFatura(e.target.value)} style={{width: '100%', padding: '10px', marginBottom: '10px'}} />
+            <h2>{lojaData.nome}</h2>
+            {carregando && <p>A processar...</p>}
+            <div style={{background: '#f9f9f9', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)'}}>
+              <input type="password" placeholder="PIN Comerciante" value={pinComerciante} onChange={e => setPinComerciante(e.target.value)} style={{width: '95%', padding: '10px', marginBottom: '10px'}} />
+              <input type="text" placeholder="Telemóvel Cliente" value={clientId} onChange={e => setClientId(e.target.value)} style={{width: '95%', padding: '10px', marginBottom: '10px'}} />
+              <input type="number" placeholder="Valor da Fatura (€)" value={valorFatura} onChange={e => setValorFatura(e.target.value)} style={{width: '95%', padding: '10px', marginBottom: '10px'}} />
               
-              {/* 🛡️ INPUT PARA PIN DO CLIENTE */}
-              <input type="password" placeholder="PIN Cliente (para descontar)" value={pinCliente} onChange={e => setPinCliente(e.target.value)} style={{width: '100%', padding: '10px', marginBottom: '10px', background: '#fff3cd'}} />
+              <div style={{padding: '10px', background: '#fff3cd', borderRadius: '5px', marginBottom: '10px'}}>
+                <label style={{fontSize: '12px', fontWeight: 'bold'}}>APENAS PARA DESCONTO:</label>
+                <input type="password" placeholder="PIN Secreto do Cliente" value={pinCliente} onChange={e => setPinCliente(e.target.value)} style={{width: '100%', padding: '10px', marginTop: '5px', border: '1px solid #ffeeba'}} />
+              </div>
               
               <div style={{display: 'flex', gap: '10px'}}>
-                <button onClick={() => executarOperacao('emissao')} style={{flex: 1, padding: '15px', background: '#27ae60', color: 'white', border: 'none'}}>EMITIR</button>
-                <button onClick={() => executarOperacao('desconto')} style={{flex: 1, padding: '15px', background: '#e67e22', color: 'white', border: 'none'}}>DESCONTAR</button>
+                <button onClick={() => executarOperacao('emissao')} style={{flex: 1, padding: '15px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer'}}>EMITIR CASHBACK</button>
+                <button onClick={() => executarOperacao('desconto')} style={{flex: 1, padding: '15px', background: '#e67e22', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer'}}>DESCONTAR SALDO</button>
               </div>
             </div>
-            <h3>Últimos Movimentos</h3>
-            {historico.map((h, i) => (
-              <div key={i} style={{padding: '10px', borderBottom: '1px solid #eee'}}>
-                {h.tipo.toUpperCase()}: {h.valorCashback.toFixed(2)}€ | Cliente: {h.clienteId}
-              </div>
-            ))}
           </div>
         ) : view === 'cliente' ? <Cliente /> : view === 'relatorio' ? <Relatorio /> : <Gestor />}
       </div>
