@@ -22,18 +22,16 @@ function Relatorio() {
 
   return (
     <div>
-      <h3>Balanço Geral da Rede</h3>
-      <table border="1" width="100%" style={{borderCollapse:'collapse'}}>
-        <thead>
-          <tr style={{background:'#f4f4f4'}}>
-            <th>Loja</th><th>Emitido</th><th>Descontado</th><th>Balanço (Dívida)</th>
-          </tr>
+      <h3>Relatório de Movimentos</h3>
+      <table border="1" width="100%" style={{borderCollapse:'collapse', textAlign:'left'}}>
+        <thead style={{background:'#eee'}}>
+          <tr><th>Loja</th><th>Emitido</th><th>Descontado</th><th>Dívida/Balanço</th></tr>
         </thead>
         <tbody>
           {dados.map((l, i) => (
             <tr key={i}>
               <td>{l.nome}</td><td>{l.e.toFixed(2)}€</td><td>{l.d.toFixed(2)}€</td>
-              <td style={{fontWeight:'bold'}}>{(l.d - l.e).toFixed(2)}€</td>
+              <td style={{fontWeight:'bold', color: (l.d - l.e) < 0 ? 'red' : 'green'}}>{(l.d - l.e).toFixed(2)}€</td>
             </tr>
           ))}
         </tbody>

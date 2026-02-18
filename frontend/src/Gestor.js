@@ -6,20 +6,21 @@ function Gestor() {
   const [f, setF] = useState({ nif: '', nome: '', pass: '', perc: '' });
 
   const salvar = async () => {
+    if(!f.nif || !f.nome) return;
     await setDoc(doc(db, "comerciantes", f.nif), {
       nome: f.nome, password: f.pass, percentagem: Number(f.perc)/100
     });
-    alert("Loja registada!");
+    alert("Loja Registada!");
   };
 
   return (
-    <div>
-      <h3>Configurar Nova Loja</h3>
-      <input type="text" placeholder="NIF" onChange={e=>setF({...f, nif: e.target.value})} style={{display:'block', marginBottom:'5px'}}/>
-      <input type="text" placeholder="Nome" onChange={e=>setF({...f, nome: e.target.value})} style={{display:'block', marginBottom:'5px'}}/>
-      <input type="password" placeholder="Senha" onChange={e=>setF({...f, pass: e.target.value})} style={{display:'block', marginBottom:'5px'}}/>
-      <input type="number" placeholder="% Cashback" onChange={e=>setF({...f, perc: e.target.value})} style={{display:'block', marginBottom:'5px'}}/>
-      <button onClick={salvar}>CADASTRAR LOJA</button>
+    <div style={{padding:'10px'}}>
+      <h3>Adicionar Loja à Rede</h3>
+      <input placeholder="NIF" onChange={e=>setF({...f, nif: e.target.value})} style={{display:'block', marginBottom:'5px'}}/>
+      <input placeholder="Nome da Loja" onChange={e=>setF({...f, nome: e.target.value})} style={{display:'block', marginBottom:'5px'}}/>
+      <input placeholder="Senha Acesso" type="password" onChange={e=>setF({...f, pass: e.target.value})} style={{display:'block', marginBottom:'5px'}}/>
+      <input placeholder="% Cashback (ex: 5)" type="number" onChange={e=>setF({...f, perc: e.target.value})} style={{display:'block', marginBottom:'5px'}}/>
+      <button onClick={salvar}>CADASTRAR</button>
     </div>
   );
 }
