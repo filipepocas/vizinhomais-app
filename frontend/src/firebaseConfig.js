@@ -1,0 +1,10 @@
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBwZSP9g7kJb_djqx_1-tHdtgO3XLChm6E",
+  authDomain: "vizinhomais.firebaseapp.com",
+  projectId: "vizinhomais",
+  storageBucket: "vizinhomais.firebasestorage.app",
+  messagingSenderId: "626292460867",
+  appId: "1:626292460867:web:4d18ab05ebb88c4bbcf3f6",
+  measurementId: "G-GZ2H4YW2Q4"
+};
