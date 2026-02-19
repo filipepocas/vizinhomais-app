@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { auth } from './firebaseConfig'; // Importa a config que criámos
+import { auth } from './firebase'; // Importa a config que criámos
 import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 
 function Register() {
@@ -88,4 +88,4 @@ function Register() {
   );
 }
 
-export default Register;
+export default Register;    
