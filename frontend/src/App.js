@@ -4,6 +4,7 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import Cliente from './Cliente';
 import Comerciante from './Comerciante';
 import AdminPortal from './AdminPortal';
+import Register from './Register'; // IMPORTANTE: Importamos o novo ficheiro
 
 function App() {
   const [view, setView] = useState('home'); 
@@ -20,7 +21,7 @@ function App() {
             if (nova && nova.length >= 4) {
               await updateDoc(doc(db, "comerciantes", loginID), { 
                 pass: nova, 
-                precisaTrocarSenha: false 
+                needsPasswordChange: false 
               });
               alert("Password definitiva guardada! Faça login novamente.");
               return;
@@ -47,6 +48,7 @@ function App() {
     } catch (e) { alert("Erro ao processar reset."); }
   };
 
+  // ECRÃ INICIAL
   if (view === 'home') {
     return (
       <div style={styles.container}>
@@ -59,6 +61,7 @@ function App() {
     );
   }
 
+  // ECRÃ LOGIN LOJA
   if (view === 'login_loja') {
     return (
       <div style={styles.container}>
@@ -72,7 +75,22 @@ function App() {
     );
   }
 
-  if (view === 'cliente') return <Cliente voltar={() => setView('home')} />;
+  // ECRÃ LOGIN CLIENTE (Aqui adicionamos a opção de registo)
+  if (view === 'cliente') {
+    return (
+        <div style={styles.container}>
+            <button onClick={() => setView('home')} style={styles.backBtn}>← Voltar</button>
+            <Cliente voltar={() => setView('home')} />
+            <hr style={{marginTop: '30px', border: '0.5px solid #eee'}} />
+            <p style={{fontSize: '14px'}}>Não tem conta?</p>
+            <button onClick={() => setView('registo_cliente')} style={{...styles.btn, background: '#2ecc71'}}>CRIAR CONTA NOVA</button>
+        </div>
+    );
+  }
+
+  // NOVO ECRÃ DE REGISTO
+  if (view === 'registo_cliente') return <Register voltar={() => setView('cliente')} />;
+
   if (view === 'dashboard_loja') return <Comerciante loja={userLogado} sair={() => setView('home')} />;
   if (view === 'admin') return <AdminPortal voltar={() => setView('home')} />;
 
