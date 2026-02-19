@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auth, db } from './firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
@@ -12,11 +12,26 @@ function Register({ voltar }) {
   const [confirmationResult, setConfirmationResult] = useState(null);
   const [message, setMessage] = useState('');
 
+  // Limpar reCAPTCHA ao desmontar o componente para evitar o erro "element removed"
+  useEffect(() => {
+    return () => {
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = null;
+      }
+    };
+  }, []);
+
   const setupRecaptcha = () => {
-    if (!window.recaptchaVerifier) {
+    try {
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+      }
       window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         'size': 'invisible',
       });
+    } catch (error) {
+      console.error("Erro ao configurar reCAPTCHA:", error);
     }
   };
 
@@ -32,6 +47,7 @@ function Register({ voltar }) {
         setMessage('Dados validados! Introduza o código SMS enviado.');
       }).catch((error) => {
         setMessage('Erro ao enviar SMS: ' + error.message);
+        if (window.recaptchaVerifier) window.recaptchaVerifier.clear();
       });
   };
 
@@ -71,47 +87,11 @@ function Register({ voltar }) {
     });
   };
 
-  const containerStyle = {
-    padding: '20px',
-    textAlign: 'center',
-    fontFamily: 'sans-serif',
-    maxWidth: '400px',
-    margin: 'auto',
-    border: '1px solid #eee',
-    borderRadius: '10px',
-    marginTop: '50px',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-  };
-
-  const inputStyle = { 
-    padding: '12px', 
-    borderRadius: '5px', 
-    border: '1px solid #ddd', 
-    fontSize: '16px',
-    marginBottom: '15px',
-    width: '100%',
-    boxSizing: 'border-box'
-  };
-
-  const btnStyle = { 
-    padding: '15px', 
-    background: '#3498db', 
-    color: 'white', 
-    border: 'none', 
-    borderRadius: '5px', 
-    cursor: 'pointer', 
-    fontWeight: 'bold', 
-    fontSize: '16px',
-    width: '100%'
-  };
-
-  const labelStyle = {
-    display: 'block',
-    textAlign: 'left',
-    marginBottom: '5px',
-    fontWeight: 'bold',
-    color: '#333'
-  };
+  // Estilos mantidos para consistência
+  const containerStyle = { padding: '20px', textAlign: 'center', fontFamily: 'sans-serif', maxWidth: '400px', margin: 'auto', border: '1px solid #eee', borderRadius: '10px', marginTop: '50px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' };
+  const inputStyle = { padding: '12px', borderRadius: '5px', border: '1px solid #ddd', fontSize: '16px', marginBottom: '15px', width: '100%', boxSizing: 'border-box' };
+  const btnStyle = { padding: '15px', background: '#3498db', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px', width: '100%' };
+  const labelStyle = { display: 'block', textAlign: 'left', marginBottom: '5px', fontWeight: 'bold', color: '#333' };
 
   return (
     <div style={containerStyle}>
@@ -119,6 +99,7 @@ function Register({ voltar }) {
       <br /><br />
       <h2 style={{ color: '#2c3e50' }}>Registo de Novo Cliente</h2>
       
+      {/* O contentor do reCAPTCHA deve estar sempre presente */}
       <div id="recaptcha-container"></div>
 
       {!confirmationResult ? (
