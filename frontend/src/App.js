@@ -1,20 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from './firebase';
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import Login from './Login';
 import Register from './Register';
 import Profile from './Profile';
 import AdminDash from './AdminDash';
-
-// Componente temporário para o Comerciante (criaremos o ficheiro depois)
-const ComercianteDash = () => (
-  <div style={{padding: '20px', textAlign: 'center'}}>
-    <h2>Painel Comerciante</h2>
-    <p>Área em desenvolvimento...</p>
-    <button onClick={() => auth.signOut()} style={{padding: '10px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '5px'}}>Sair</button>
-  </div>
-);
+import ComercianteDash from './ComercianteDash';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -25,13 +17,16 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (usuarioFirebase) => {
       if (usuarioFirebase) {
-        // Tentamos procurar primeiro na coleção 'clientes' (conforme a tua imagem)
-        let docRef = doc(db, "clientes", "199800480"); // Usando o teu NIF da imagem para teste direto
+        console.log("Utilizador logado:", usuarioFirebase.uid);
+        
+        // 1. Tentar encontrar na coleção 'utilizadores' (O padrão que queremos)
+        let docRef = doc(db, "utilizadores", usuarioFirebase.uid);
         let docSnap = await getDoc(docRef);
 
-        // Se não encontrar pelo NIF, tenta procurar numa coleção geral 'utilizadores'
+        // 2. Se não existir, tentar na coleção antiga 'clientes' pelo NIF que vimos na imagem
         if (!docSnap.exists()) {
-          docRef = doc(db, "utilizadores", usuarioFirebase.uid);
+          console.log("Não encontrado em 'utilizadores', a procurar em 'clientes'...");
+          docRef = doc(db, "clientes", "199800480"); 
           docSnap = await getDoc(docRef);
         }
 
@@ -40,12 +35,21 @@ function App() {
           setUserData(data);
           setUser(usuarioFirebase);
           
-          // Lógica de Redirecionamento baseada no campo 'tipo' que vais adicionar
           if (data.tipo === 'admin') setTela('admin');
           else if (data.tipo === 'comerciante') setTela('comerciante');
           else setTela('perfil'); 
         } else {
-          // Se o utilizador existe no Auth mas não no Firestore
+          // 3. Se ainda assim não encontrar perfil, criamos um perfil base para evitar bloqueio
+          console.log("Perfil não encontrado. A criar perfil de emergência...");
+          const novoPerfil = {
+            uid: usuarioFirebase.uid,
+            tipo: 'cliente',
+            nome: "Utilizador Novo",
+            telefone: usuarioFirebase.phoneNumber || "S/N"
+          };
+          await setDoc(doc(db, "utilizadores", usuarioFirebase.uid), novoPerfil);
+          setUserData(novoPerfil);
+          setUser(usuarioFirebase);
           setTela('perfil');
         }
       } else {
