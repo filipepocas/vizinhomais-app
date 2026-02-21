@@ -1,133 +1,115 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { auth, db } from './firebase';
-import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
 
 function Register({ voltar }) {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
-  const [codigoPostal, setCodigoPostal] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState(null);
+  const [nif, setNif] = useState('');
+  const [password, setPassword] = useState('');
+  const [telefone, setTelefone] = useState('');
   const [message, setMessage] = useState('');
 
-  // Limpar reCAPTCHA ao desmontar o componente para evitar o erro "element removed"
-  useEffect(() => {
-    return () => {
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = null;
-      }
-    };
-  }, []);
-
-  const setupRecaptcha = () => {
-    try {
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-      }
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        'size': 'invisible',
-      });
-    } catch (error) {
-      console.error("Erro ao configurar reCAPTCHA:", error);
-    }
-  };
-
-  const sendSMS = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
-    setupRecaptcha();
-    const appVerifier = window.recaptchaVerifier;
-    const formattedPhone = `+351${phoneNumber}`; 
     
-    signInWithPhoneNumber(auth, formattedPhone, appVerifier)
-      .then((result) => {
-        setConfirmationResult(result);
-        setMessage('Dados validados! Introduza o código SMS enviado.');
-      }).catch((error) => {
-        setMessage('Erro ao enviar SMS: ' + error.message);
-        if (window.recaptchaVerifier) window.recaptchaVerifier.clear();
-      });
-  };
+    // Validação básica de NIF (9 dígitos)
+    if (nif.length !== 9) {
+      setMessage('O NIF deve ter exatamente 9 dígitos.');
+      return;
+    }
 
-  const criarPerfilNoFirestore = async (uid, telefone) => {
     try {
-      const userRef = doc(db, "clientes", telefone);
-      const docSnap = await getDoc(userRef);
+      // 1. Criar o utilizador no Firebase Auth (Email e Pass)
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-      if (!docSnap.exists()) {
-        await setDoc(userRef, {
-          uid: uid,
-          nome: nome,
-          email: email,
-          codigoPostal: codigoPostal,
-          telefone: telefone,
-          pontos: 0,
-          dataRegisto: new Date().toISOString(),
-          historico: []
-        });
-        setMessage('Conta criada com sucesso! Bem-vindo(a), ' + nome);
-      } else {
-        setMessage('Bem-vindo de volta! O seu perfil já existia.');
-      }
+      // 2. Criar o documento no Firestore usando o NIF como ID
+      // Assim, o NIF nunca muda e é a base de tudo
+      await setDoc(doc(db, "clientes", nif), {
+        uid: user.uid,
+        nome: nome,
+        email: email,
+        nif: nif,
+        telefone: telefone,
+        pontos: 0,
+        dataRegisto: new Date().toISOString()
+      });
+
+      setMessage('Conta criada com sucesso! NIF: ' + nif);
       
-      setTimeout(() => voltar(), 3000);
+      // Espera 2 segundos e volta ao início
+      setTimeout(() => voltar(), 2000);
+
     } catch (error) {
-      setMessage('Erro ao gravar dados: ' + error.message);
+      // Tradução simples de erros comuns
+      if (error.code === 'auth/email-already-in-use') {
+        setMessage('Este email já está registado.');
+      } else if (error.code === 'auth/weak-password') {
+        setMessage('A password deve ter pelo menos 6 caracteres.');
+      } else {
+        setMessage('Erro: ' + error.message);
+      }
     }
   };
 
-  const verifyCode = (e) => {
-    e.preventDefault();
-    confirmationResult.confirm(verificationCode).then((result) => {
-      criarPerfilNoFirestore(result.user.uid, phoneNumber);
-    }).catch((error) => {
-      setMessage('Código incorreto: ' + error.message);
-    });
+  const containerStyle = {
+    padding: '20px',
+    textAlign: 'center',
+    fontFamily: 'sans-serif',
+    maxWidth: '400px',
+    margin: 'auto',
+    border: '1px solid #eee',
+    borderRadius: '10px',
+    marginTop: '30px',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
   };
 
-  // Estilos mantidos para consistência
-  const containerStyle = { padding: '20px', textAlign: 'center', fontFamily: 'sans-serif', maxWidth: '400px', margin: 'auto', border: '1px solid #eee', borderRadius: '10px', marginTop: '50px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' };
-  const inputStyle = { padding: '12px', borderRadius: '5px', border: '1px solid #ddd', fontSize: '16px', marginBottom: '15px', width: '100%', boxSizing: 'border-box' };
-  const btnStyle = { padding: '15px', background: '#3498db', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px', width: '100%' };
-  const labelStyle = { display: 'block', textAlign: 'left', marginBottom: '5px', fontWeight: 'bold', color: '#333' };
+  const inputStyle = { 
+    padding: '12px', 
+    borderRadius: '5px', 
+    border: '1px solid #ddd', 
+    fontSize: '16px',
+    marginBottom: '10px',
+    width: '100%',
+    boxSizing: 'border-box'
+  };
+
+  const btnStyle = { 
+    padding: '15px', 
+    background: '#2ecc71', 
+    color: 'white', 
+    border: 'none', 
+    borderRadius: '5px', 
+    cursor: 'pointer', 
+    fontWeight: 'bold', 
+    width: '100%',
+    fontSize: '16px'
+  };
 
   return (
     <div style={containerStyle}>
-      <button onClick={voltar} style={{ background: 'none', border: 'none', color: '#7f8c8d', cursor: 'pointer', float: 'left' }}>← Voltar</button>
+      <button onClick={voltar} style={{ float: 'left', background: 'none', border: 'none', cursor: 'pointer', color: '#7f8c8d' }}>← Voltar</button>
       <br /><br />
-      <h2 style={{ color: '#2c3e50' }}>Registo de Novo Cliente</h2>
+      <h2 style={{ color: '#2c3e50' }}>Registo de Cartão Cliente</h2>
+      <p style={{ fontSize: '14px', color: '#7f8c8d', marginBottom: '20px' }}>O NIF será o seu identificador permanente.</p>
       
-      {/* O contentor do reCAPTCHA deve estar sempre presente */}
-      <div id="recaptcha-container"></div>
-
-      {!confirmationResult ? (
-        <form onSubmit={sendSMS} style={{ display: 'flex', flexDirection: 'column' }}>
-          <label style={labelStyle}>Nome Completo</label>
-          <input type="text" placeholder="Ex: João Silva" value={nome} onChange={(e) => setNome(e.target.value)} style={inputStyle} required />
-          
-          <label style={labelStyle}>Email</label>
-          <input type="email" placeholder="exemplo@email.com" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} required />
-          
-          <label style={labelStyle}>Código Postal</label>
-          <input type="text" placeholder="4000-000" value={codigoPostal} onChange={(e) => setCodigoPostal(e.target.value)} style={inputStyle} required />
-          
-          <label style={labelStyle}>Telemóvel</label>
-          <input type="tel" placeholder="912345678" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} style={inputStyle} required />
-          
-          <button type="submit" style={btnStyle}>Enviar Código SMS</button>
-        </form>
-      ) : (
-        <form onSubmit={verifyCode} style={{ display: 'flex', flexDirection: 'column' }}>
-          <p style={{ color: '#27ae60' }}>Enviámos um SMS para o número +351{phoneNumber}</p>
-          <label style={labelStyle}>Código de 6 dígitos</label>
-          <input type="text" placeholder="123456" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value)} style={inputStyle} required />
-          <button type="submit" style={{ ...btnStyle, background: '#2ecc71' }}>Verificar e Finalizar</button>
-        </form>
-      )}
+      <form onSubmit={handleRegister}>
+        <input type="text" placeholder="Nome Completo" value={nome} onChange={(e) => setNome(e.target.value)} style={inputStyle} required />
+        
+        <input type="text" placeholder="NIF (Identificador único)" value={nif} onChange={(e) => setNif(e.target.value)} style={inputStyle} required />
+        
+        <input type="email" placeholder="Email para login" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} required />
+        
+        <input type="tel" placeholder="Telemóvel" value={telefone} onChange={(e) => setTelefone(e.target.value)} style={inputStyle} required />
+        
+        <input type="password" placeholder="Defina uma Password" value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} required />
+        
+        <button type="submit" style={btnStyle}>Criar Cartão Digital</button>
+      </form>
       
-      <p style={{ marginTop: '20px', color: 'blue', fontWeight: 'bold' }}>{message}</p>
+      {message && <p style={{ marginTop: '20px', color: message.includes('sucesso') ? 'green' : 'red', fontWeight: 'bold' }}>{message}</p>}
     </div>
   );
 }
