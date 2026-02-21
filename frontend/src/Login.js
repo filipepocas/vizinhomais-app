@@ -7,50 +7,51 @@ function Login({ aoLogar, irParaRegisto }) {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   
-  // Estados para a recuperação por SMS
   const [confirmacao, setConfirmacao] = useState(null);
   const [codigoSMS, setCodigoSMS] = useState('');
   const [passNova, setPassNova] = useState('');
   const [etapaRecuperacao, setEtapaRecuperacao] = useState(false);
 
-  // Função para Login Normal
   const handleLogin = async (e) => {
     e.preventDefault();
+    setMessage('A validar...');
     try {
-      const emailFicticio = `${telefone}@vizinhomais.com`;
+      // Limpa o número de espaços ou prefixos para o email fictício
+      const telLimpo = telefone.replace('+351', '').trim();
+      const emailFicticio = `${telLimpo}@vizinhomais.com`;
       await signInWithEmailAndPassword(auth, emailFicticio, password);
       setMessage('Entrada autorizada!');
       aoLogar(); 
     } catch (error) {
-      setMessage('Dados incorretos. Verifique o telemóvel e a password.');
+      console.error(error);
+      setMessage('Dados incorretos. Se não lembra da pass, use a recuperação por SMS abaixo.');
     }
   };
 
-  // Função para iniciar Recuperação por SMS
   const recuperarViaSMS = async () => {
     if (!telefone) {
-      setMessage('Introduza o seu telemóvel primeiro.');
+      setMessage('Introduza o seu telemóvel (ex: +351918772065)');
       return;
     }
 
     try {
-      // Configura o ReCAPTCHA invisível
-      const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        'size': 'invisible'
-      });
+      if (!window.recaptchaVerifier) {
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          'size': 'invisible'
+        });
+      }
       
-      const numeroCompleto = `+351${telefone}`;
-      const confirmationResult = await signInWithPhoneNumber(auth, numeroCompleto, recaptchaVerifier);
+      const numeroParaEnvio = telefone.includes('+') ? telefone : `+351${telefone}`;
+      const confirmationResult = await signInWithPhoneNumber(auth, numeroParaEnvio, window.recaptchaVerifier);
       
       setConfirmacao(confirmationResult);
       setEtapaRecuperacao(true);
-      setMessage('Código de verificação enviado por SMS!');
+      setMessage('Use o código de teste 123456 ou aguarde o SMS.');
     } catch (error) {
-      setMessage('Erro ao enviar SMS: ' + error.message);
+      setMessage('Erro ao iniciar recuperação: ' + error.message);
     }
   };
 
-  // Função para confirmar código e gravar nova password
   const confirmarEDefinirPass = async () => {
     try {
       if (passNova.length < 6) {
@@ -58,21 +59,17 @@ function Login({ aoLogar, irParaRegisto }) {
         return;
       }
 
-      // Valida o código SMS recebido
       await confirmacao.confirm(codigoSMS);
       
-      // Com o utilizador validado pela sessão de SMS, alteramos a password
       const user = auth.currentUser;
       if (user) {
         await updatePassword(user, passNova);
-        setMessage('Password alterada com sucesso! Já pode fazer login.');
+        setMessage('Sucesso! Password alterada. Tente fazer login agora.');
         setEtapaRecuperacao(false);
         setConfirmacao(null);
-        setPassNova('');
-        setCodigoSMS('');
       }
     } catch (error) {
-      setMessage('Código inválido ou erro ao processar alteração.');
+      setMessage('Código inválido. Use o código 123456 configurado no Firebase.');
     }
   };
 
@@ -100,10 +97,10 @@ function Login({ aoLogar, irParaRegisto }) {
         </>
       ) : (
         <div>
-          <p style={{ fontSize: '14px', marginBottom: '10px' }}>Introduza o código de 6 dígitos enviado para <strong>+351{telefone}</strong></p>
-          <input type="text" placeholder="Código SMS" value={codigoSMS} onChange={(e) => setCodigoSMS(e.target.value)} style={inputStyle} />
-          <input type="password" placeholder="Defina a Nova Password" value={passNova} onChange={(e) => setPassNova(e.target.value)} style={inputStyle} />
-          <button onClick={confirmarEDefinirPass} style={{ ...btnStyle, background: '#2ecc71' }}>Validar e Alterar Password</button>
+          <p style={{ fontSize: '14px', marginBottom: '10px' }}>Introduza o código (Teste: 123456)</p>
+          <input type="text" placeholder="Código de 6 dígitos" value={codigoSMS} onChange={(e) => setCodigoSMS(e.target.value)} style={inputStyle} />
+          <input type="password" placeholder="Nova Password" value={passNova} onChange={(e) => setPassNova(e.target.value)} style={inputStyle} />
+          <button onClick={confirmarEDefinirPass} style={{ ...btnStyle, background: '#2ecc71' }}>Alterar Password</button>
           <button onClick={() => setEtapaRecuperacao(false)} style={{ marginTop: '10px', background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }}>Cancelar</button>
         </div>
       )}
@@ -113,7 +110,7 @@ function Login({ aoLogar, irParaRegisto }) {
         Criar Novo Cartão
       </button>
 
-      {message && <p style={{ marginTop: '20px', color: message.includes('sucesso') || message.includes('enviado') ? 'green' : 'red', fontWeight: 'bold' }}>{message}</p>}
+      {message && <p style={{ marginTop: '20px', color: message.includes('Sucesso') ? 'green' : 'red', fontWeight: 'bold' }}>{message}</p>}
     </div>
   );
 }
