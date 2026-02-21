@@ -3,37 +3,39 @@ import { auth } from './firebase';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 
 function Login({ aoLogar, irParaRegisto }) {
-  const [email, setEmail] = useState('');
+  const [telefone, setTelefone] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      setMessage('Login efetuado com sucesso!');
-      aoLogar(); // Função que muda o ecrã para o Perfil
+      // Convertemos o telemóvel no email fictício para o Firebase validar
+      const emailFicticio = `${telefone}@vizinhomais.com`;
+      
+      await signInWithEmailAndPassword(auth, emailFicticio, password);
+      setMessage('Entrada autorizada!');
+      aoLogar(); 
     } catch (error) {
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        setMessage('Email ou password incorretos.');
-      } else if (error.code === 'auth/invalid-credential') {
-        setMessage('Credenciais inválidas. Verifique os seus dados.');
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setMessage('Telemóvel ou password incorretos.');
       } else {
-        setMessage('Erro: ' + error.message);
+        setMessage('Erro ao entrar: ' + error.message);
       }
     }
   };
 
   const recuperarSenha = async () => {
-    if (!email) {
-      setMessage('Por favor, introduza o seu email primeiro.');
+    if (!telefone) {
+      setMessage('Introduza o seu telemóvel para recuperar a senha.');
       return;
     }
     try {
-      await sendPasswordResetEmail(auth, email);
-      setMessage('Email de recuperação enviado! Verifique a sua caixa de entrada.');
+      const emailFicticio = `${telefone}@vizinhomais.com`;
+      await sendPasswordResetEmail(auth, emailFicticio);
+      setMessage('Pedido de recuperação enviado! Se o telemóvel estiver associado a um email real, verifique a caixa de entrada.');
     } catch (error) {
-      setMessage('Erro ao enviar recuperação: ' + error.message);
+      setMessage('Erro na recuperação: Verifique se o número está correto.');
     }
   };
 
@@ -73,21 +75,22 @@ function Login({ aoLogar, irParaRegisto }) {
 
   return (
     <div style={containerStyle}>
-      <h2 style={{ color: '#2c3e50' }}>Entrar no Cartão Cliente</h2>
+      <h2 style={{ color: '#2c3e50' }}>Login Cartão Cliente</h2>
+      <p style={{ fontSize: '14px', color: '#7f8c8d', marginBottom: '20px' }}>Entre com o seu número de telemóvel</p>
       
       <form onSubmit={handleLogin}>
         <input 
-          type="email" 
-          placeholder="O seu Email" 
-          value={email} 
-          onChange={(e) => setEmail(e.target.value)} 
+          type="tel" 
+          placeholder="Nº de Telemóvel" 
+          value={telefone} 
+          onChange={(e) => setTelefone(e.target.value)} 
           style={inputStyle} 
           required 
         />
         
         <input 
           type="password" 
-          placeholder="A sua Password" 
+          placeholder="Password" 
           value={password} 
           onChange={(e) => setPassword(e.target.value)} 
           style={inputStyle} 
@@ -99,22 +102,21 @@ function Login({ aoLogar, irParaRegisto }) {
 
       <button 
         onClick={recuperarSenha} 
-        style={{ marginTop: '15px', background: 'none', border: 'none', color: '#7f8c8d', cursor: 'pointer', fontSize: '14px', textDecoration: 'underline' }}
+        style={{ marginTop: '15px', background: 'none', border: 'none', color: '#7f8c8d', cursor: 'pointer', fontSize: '13px', textDecoration: 'underline' }}
       >
         Esqueci-me da password
       </button>
 
       <hr style={{ margin: '20px 0', border: '0', borderTop: '1px solid #eee' }} />
 
-      <p style={{ fontSize: '14px' }}>Ainda não tem cartão?</p>
       <button 
         onClick={irParaRegisto} 
         style={{ background: '#2ecc71', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
       >
-        Criar Novo Cartão
+        Ainda não tenho Cartão
       </button>
 
-      {message && <p style={{ marginTop: '20px', color: message.includes('sucesso') ? 'green' : 'red', fontWeight: 'bold' }}>{message}</p>}
+      {message && <p style={{ marginTop: '20px', color: message.includes('autorizada') ? 'green' : 'red', fontWeight: 'bold' }}>{message}</p>}
     </div>
   );
 }
